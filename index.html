@@ -1,42 +1,205 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Web Bluetooth Test</title>
-</head>
-<body>
-  <h2>Web Bluetooth Test</h2>
-  <button id="connectButton">Connect to Bluetooth Device</button>
-  <div id="log"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web BLE Variable Binary Transfer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+      }
+      input {
+        padding: 10px;
+        width: 100px;
+        margin: 5px;
+      }
+      #log {
+        border: 1px solid #ccc;
+        padding: 10px;
+        height: 200px;
+        overflow-y: scroll;
+        margin-top: 10px;
+      }
+      #sendProgress,
+      #receiveProgress {
+        width: 100%;
+        height: 20px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Web BLE Variable Binary Transfer with Docklight</h2>
+    <p>Current Time: 09:17 PM IST, Monday, June 02, 2025</p>
+    <button id="connectButton">Connect to HLK-B40</button>
+    <div>
+      <input
+        id="byteCountInput"
+        type="number"
+        placeholder="Bytes to send"
+        min="1"
+        value="5000"
+      />
+      <button id="sendBinaryButton" disabled>Send Binary Data</button>
+    </div>
+    <h4>Send Progress</h4>
+    <progress id="sendProgress" value="0" max="100"></progress>
+    <h4>Receive Progress</h4>
+    <progress id="receiveProgress" value="0" max="100"></progress>
+    <div>
+      <h3>Log</h3>
+      <div id="log"></div>
+    </div>
 
-  <script>
-    const logDiv = document.getElementById('log');
-    const connectButton = document.getElementById('connectButton');
+    <script>
+      const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
+      const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
+      const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
+      const maxWriteSize = 512; // Web Bluetooth API limit for writeValue
 
-    function log(message) {
-      logDiv.innerHTML += message + '<br>';
-    }
+      let device, notifyCharacteristic, writeCharacteristic;
+      let receiveBuffer = [];
+      let receivedBytes = 0;
+      let expectedReceiveBytes = 3072; // Set based on your test (3 × 1024)
 
-    async function connectToDevice() {
-      try {
-        log('Checking Web Bluetooth availability...');
-        if (!navigator.bluetooth) {
-          throw new Error('Web Bluetooth API is not available in this browser.');
+      const connectButton = document.getElementById("connectButton");
+      const sendBinaryButton = document.getElementById("sendBinaryButton");
+      const byteCountInput = document.getElementById("byteCountInput");
+      const logDiv = document.getElementById("log");
+      const sendProgressBar = document.getElementById("sendProgress");
+      const receiveProgressBar = document.getElementById("receiveProgress");
+
+      function log(message) {
+        logDiv.innerHTML += message + "<br>";
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function bytesToHex(bytes) {
+        return Array.from(bytes, (byte) =>
+          byte.toString(16).padStart(2, "0")
+        ).join(" ");
+      }
+
+      async function connectToDevice() {
+        try {
+          log("Requesting Bluetooth device...");
+          device = await navigator.bluetooth.requestDevice({
+            filters: [{ name: "CARCAT_5G" }],
+            optionalServices: [serviceUuid],
+          });
+
+          log("Connecting to GATT server...");
+          const server = await device.gatt.connect();
+
+          log("Getting primary service...");
+          const service = await server.getPrimaryService(serviceUuid);
+
+          log("Getting notify characteristic...");
+          notifyCharacteristic = await service.getCharacteristic(
+            notifyCharUuid
+          );
+
+          log("Getting write characteristic...");
+          writeCharacteristic = await service.getCharacteristic(writeCharUuid);
+
+          log("Starting notifications...");
+          await notifyCharacteristic.startNotifications();
+          notifyCharacteristic.addEventListener(
+            "characteristicvaluechanged",
+            handleNotifications
+          );
+
+          device.addEventListener("gattserverdisconnected", () => {
+            log("Device disconnected.");
+            sendBinaryButton.disabled = true;
+            connectButton.disabled = false;
+            receiveBuffer = [];
+            receivedBytes = 0;
+            receiveProgressBar.value = 0;
+          });
+
+          log("Connected to CARCAT_5G!");
+          connectButton.disabled = true;
+          sendBinaryButton.disabled = false;
+        } catch (error) {
+          log("Error: " + error);
+        }
+      }
+
+      function handleNotifications(event) {
+        const value = new Uint8Array(event.target.value.buffer);
+        receiveBuffer.push(...value);
+        receivedBytes += value.length;
+
+        log(
+          `Received chunk: ${bytesToHex(value)} (${
+            value.length
+          } bytes, total: ${receivedBytes})`
+        );
+        receiveProgressBar.value = receivedBytes;
+        if (receivedBytes >= expectedReceiveBytes) {
+          log(`Received all expected ${expectedReceiveBytes} bytes!`);
+          receivedBytes = 0; // Reset for the next transfer
+          receiveProgressBar.value = 0;
+        }
+      }
+
+      async function sendBinaryData() {
+        if (!writeCharacteristic) {
+          log("Not connected to a device.");
+          return;
         }
 
-        log('Requesting Bluetooth device...');
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [{ name: 'CARCAT_5G' }],
-          optionalServices: ['0000fff0-0000-1000-8000-00805f9b34fb']
-        });
+        const numBytes = parseInt(byteCountInput.value, 10);
+        if (isNaN(numBytes) || numBytes < 1) {
+          log("Please enter a valid number of bytes.");
+          return;
+        }
 
-        log('Device found: ' + device.name);
-      } catch (error) {
-        log('Error: ' + error);
+        const data = new Uint8Array(numBytes);
+        for (let i = 0; i < numBytes; i++) {
+          data[i] = i % 256;
+        }
+
+        log(`Sending ${numBytes} bytes to Docklight...`);
+        log(`Data: ${bytesToHex(data)}`);
+
+        let bytesSent = 0;
+        sendProgressBar.value = 0;
+        sendProgressBar.max = numBytes;
+
+        for (let i = 0; i < data.length; i += maxWriteSize) {
+          const chunk = data.slice(i, i + maxWriteSize);
+          try {
+            await writeCharacteristic.writeValue(chunk);
+            bytesSent += chunk.length;
+            sendProgressBar.value = bytesSent;
+            log(
+              `Sent chunk of ${chunk.length} bytes (${bytesSent}/${numBytes})`
+            );
+            await new Promise((resolve) => setTimeout(resolve, 20)); // Reduced delay
+          } catch (error) {
+            log("Error sending chunk: " + error);
+            return;
+          }
+        }
+
+        log(`Successfully sent ${numBytes} bytes.`);
       }
-    }
 
-    connectButton.addEventListener('click', connectToDevice);
-  </script>
-</body>
+      connectButton.addEventListener("click", connectToDevice);
+      sendBinaryButton.addEventListener("click", sendBinaryData);
+      byteCountInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendBinaryData();
+      });
+
+      // Set receive progress bar max based on expected bytes
+      receiveProgressBar.max = expectedReceiveBytes;
+    </script>
+  </body>
 </html>

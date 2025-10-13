@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Web BLE LIVE parser (compact)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin:16px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    label { font-size:0.9rem; }
+    input[type="text"], input[type="number"] { padding:6px; font-family:monospace; }
+    input.small { width:120px; }
+    .box { border:1px solid #ddd; padding:8px; background:#fafafa; min-width:280px; }
+    #recvRaw { height:160px; overflow:auto; border:1px solid #ccc; padding:8px; background:#111; color:#0f0; font-family:monospace; }
+    #parsed { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin-top:8px; }
+    button { padding:6px 10px; }
+  </style>
+</head>
+<body>
+  <h3>Compact LIVE Data UI</h3>
+
+  <div class="row">
+    <button id="connectButton">Connect</button>
+    <button id="disconnectButton" disabled>Disconnect</button>
+    <button id="sendLiveBtn" disabled>SEND LIVE CMD</button>
+  </div>
+
+  <hr />
+
+  <div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <div style="flex:1">
+        <div class="box">
+          <strong>Raw Receive (Docklight hex)</strong>
+          <div id="recvRaw"></div>
+          <div style="margin-top:8px;">
+            <button id="clearRaw">Clear Raw</button>
+            <button id="forceParse">Parse latest LIVE (force)</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:360px">
+        <div class="box">
+          <strong>LIVE Data (parsed)</strong>
+          <div id="parsed">
+            <div>
+              <label>Battery (mV)</label><br>
+              <input id="battery_mV" class="small" type="number" readonly />
+            </div>
+            <div>
+              <label>Min freq (Hz)</label><br>
+              <input id="minHz" class="small" type="number" readonly />
+            </div>
+            <div>
+              <label>Max freq (Hz)</label><br>
+              <input id="maxHz" class="small" type="number" readonly />
+            </div>
+            <div>
+              <label>Wave velocity</label><br>
+              <input id="waveVel" class="small" type="number" readonly />
+            </div>
+            <div>
+              <label>Pattern enum</label><br>
+              <input id="pattern" class="small" type="number" readonly />
+            </div>
+            <div>
+              <label>Current (mA)</label><br>
+              <input id="current_mA" class="small" type="number" readonly />
+            </div>
+            <div>
+              <label>Temperature (°C)</label><br>
+              <input id="tempC" class="small" type="number" readonly />
+            </div>
+            <div>
+              <label>Uptime Days</label><br>
+              <input id="days" class="small" type="number" readonly />
+            </div>
+            <div>
+              <label>HH:MM:SS</label><br>
+              <input id="hhmmss" class="small" type="text" readonly />
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            <button id="copyParsed">Copy parsed to clipboard</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- BLE UUIDs (unchanged) ---
+    const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
+    const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
+    const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
+
+    // LIVE command hex (from your file)
+    const LIVE_CMD_HEX = "FD FC FB FA 04 00 4C 49 56 45 04 03 02 01";
+
+    // DOM
+    const connectButton = document.getElementById("connectButton");
+    const disconnectButton = document.getElementById("disconnectButton");
+    const sendLiveBtn = document.getElementById("sendLiveBtn");
+    const recvRaw = document.getElementById("recvRaw");
+    const clearRaw = document.getElementById("clearRaw");
+    const forceParse = document.getElementById("forceParse");
+
+    const battery_mV = document.getElementById("battery_mV");
+    const minHz = document.getElementById("minHz");
+    const maxHz = document.getElementById("maxHz");
+    const waveVel = document.getElementById("waveVel");
+    const pattern = document.getElementById("pattern");
+    const current_mA = document.getElementById("current_mA");
+    const tempC = document.getElementById("tempC");
+    const days = document.getElementById("days");
+    const hhmmss = document.getElementById("hhmmss");
+    const copyParsed = document.getElementById("copyParsed");
+
+    // BLE variables
+    let device, server, notifyChar, writeChar;
+    let lastPacket = null;
+
+    function bytesToHexUpper(bytes) {
+      return Array.from(bytes).map(b => b.toString(16).padStart(2,"0").toUpperCase()).join(" ");
+    }
+
+    // Append raw receive line (Docklight style)
+    function appendRaw(bytes) {
+      const t = new Date().toLocaleTimeString();
+      lastPacket = bytes; // keep last
+      recvRaw.innerHTML += `[${t}] ${bytesToHexUpper(bytes)}<br>`;
+      recvRaw.scrollTop = recvRaw.scrollHeight;
+    }
+
+    // Heuristic parser:
+    // - look for ASCII "LIVE" (0x4C 0x49 0x56 0x45)
+    // - then read fields at offsets relative to 'L' according to the PDF layout used as reference.
+    // NOTE: this is a best-effort mapping; adjust offsets if your firmware uses different positions.
+    function parseLivePacket(bytes) {
+      const buf = Uint8Array.from(bytes);
+      // find sequence 4C 49 56 45
+      let idx = -1;
+      for (let i=0; i <= buf.length - 4; ++i) {
+        if (buf[i] === 0x4C && buf[i+1] === 0x49 && buf[i+2] === 0x56 && buf[i+3] === 0x45) { idx = i; break; }
+      }
+      if (idx < 0) return { error: "LIVE tag not found" };
+
+      // Offsets were derived from the PDF you provided (best-effort).
+      // Low-byte first (little-endian) for multi-byte numbers.
+      // The offsets below are relative to the 'L' (idx).
+      // If parsed values are obviously wrong you can provide exact byte indexes and I'll update these.
+      const offs = {
+        battery_low: idx + 4,   // battery mV low
+        battery_high: idx + 5,  // battery mV high
+        // min freq (Hz*1000 in PDF — they show kHz*1000), stored as 16-bit
+        min_low: idx + 8,
+        min_high: idx + 9,
+        // max freq
+        max_low: idx + 10,
+        max_high: idx + 11,
+        // wave velocity (16-bit?) PDF shows 149 = 0x0095 low/high
+        wave_low: idx + 12,
+        wave_high: idx + 13,
+        // pattern enum (1 byte)
+        pattern: idx + 14,
+        // current (mA *1000 in PDF — they used microamps; PDF had current 45.78mA => 45780uA => 0xB2D4 but we'll return mA)
+        current_low: idx + 15,
+        current_high: idx + 16,
+        // temp (1 byte) and uptime days and HH MM SS
+        temp_idx: idx + 17,
+        days_low: idx + 18,
+        days_high: idx + 19,
+        hh: idx + 20,
+        mm: idx + 21,
+        ss: idx + 22
+      };
+
+      // safe read helpers
+      const readU8 = (i) => (i < buf.length ? buf[i] : null);
+      const readU16le = (lowIdx, highIdx) => {
+        const l = readU8(lowIdx), h = readU8(highIdx);
+        if (l===null || h===null) return null;
+        return (h << 8) | l;
+      };
+
+      const battery = readU16le(offs.battery_low, offs.battery_high); // mV if doc mapping
+      const minRaw = readU16le(offs.min_low, offs.min_high);
+      const maxRaw = readU16le(offs.max_low, offs.max_high);
+      const waveRaw = readU16le(offs.wave_low, offs.wave_high);
+      const patternEnum = readU8(offs.pattern);
+      const currentRaw = readU16le(offs.current_low, offs.current_high);
+      const temp = readU8(offs.temp_idx);
+      const daysVal = readU16le(offs.days_low, offs.days_high);
+      const hh = readU8(offs.hh);
+      const mm = readU8(offs.mm);
+      const ss = readU8(offs.ss);
+
+      // Interpretations (per PDF style):
+      // - battery: value appears to be mV already (example: 0x3034 => 12340 mV)
+      // - min/max: PDF multiplied kHz by 1000 (so 17.4 kHz -> 17400 -> 0x43F8). So treat these as Hz (raw value is Hz)
+      // - waveRaw: unit unclear in doc, but example was 149 -> we'll return as-is
+      // - currentRaw: PDF stored microamps (uA) in example; convert to mA (divide by 1000) if value present.
+      // If any field is null, return null for that field.
+
+      // convert currentRaw (if present) to mA with fractional if necessary:
+      const current_mA_val = (currentRaw !== null) ? (currentRaw / 1000) : null;
+
+      return {
+        battery_mV: battery,
+        min_Hz: minRaw,
+        max_Hz: maxRaw,
+        waveVal: waveRaw,
+        pattern: patternEnum,
+        current_mA: current_mA_val,
+        tempC: temp,
+        days: daysVal,
+        hh, mm, ss,
+        liveStartIndex: idx,
+        rawHex: bytesToHexUpper(buf)
+      };
+    }
+
+    // update UI with parsed object
+    function showParsed(obj) {
+      if (!obj || obj.error) {
+        // Clear fields
+        battery_mV.value = ""; minHz.value = ""; maxHz.value = ""; waveVel.value = "";
+        pattern.value = ""; current_mA.value = ""; tempC.value = ""; days.value = ""; hhmmss.value = "";
+        return;
+      }
+      battery_mV.value = (obj.battery_mV !== null ? obj.battery_mV : "");
+      minHz.value = (obj.min_Hz !== null ? obj.min_Hz : "");
+      maxHz.value = (obj.max_Hz !== null ? obj.max_Hz : "");
+      waveVel.value = (obj.waveVal !== null ? obj.waveVal : "");
+      pattern.value = (obj.pattern !== null ? obj.pattern : "");
+      current_mA.value = (obj.current_mA !== null ? obj.current_mA : "");
+      tempC.value = (obj.tempC !== null ? obj.tempC : "");
+      days.value = (obj.days !== null ? obj.days : "");
+      hhmmss.value = (obj.hh !== undefined ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "");
+    }
+
+    // BLE connect
+    async function connect() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: "CARCAT" }, { name: "CARCAT_5G" }],
+          optionalServices: [serviceUuid],
+        });
+        server = await device.gatt.connect();
+        const svc = await server.getPrimaryService(serviceUuid);
+        notifyChar = await svc.getCharacteristic(notifyCharUuid);
+        writeChar = await svc.getCharacteristic(writeCharUuid);
+
+        await notifyChar.startNotifications();
+        notifyChar.addEventListener("characteristicvaluechanged", onNotify);
+
+        connectButton.disabled = true;
+        disconnectButton.disabled = false;
+        sendLiveBtn.disabled = false;
+      } catch (e) {
+        alert("Connect failed: " + e);
+      }
+    }
+
+    async function disconnect() {
+      try {
+        if (device && device.gatt.connected) device.gatt.disconnect();
+      } finally {
+        connectButton.disabled = false;
+        disconnectButton.disabled = true;
+        sendLiveBtn.disabled = true;
+      }
+    }
+
+    function onNotify(ev) {
+      const arr = new Uint8Array(ev.target.value.buffer);
+      appendRaw(arr);
+      // auto-parse on any notification containing LIVE tag
+      if (bytesToHexUpper(arr).includes("4C 49 56 45") || bytesToHexUpper(arr).includes("LIVE")) {
+        const parsed = parseLivePacket(arr);
+        if (!parsed.error) showParsed(parsed);
+      }
+    }
+
+    // send LIVE command
+    async function sendLiveCmd() {
+      if (!writeChar) { alert("Not connected"); return; }
+      // convert hex to bytes
+      const cleaned = LIVE_CMD_HEX.replace(/0x/g, "").replace(/[^A-Fa-f0-9]/g,"");
+      const b = new Uint8Array(cleaned.length/2);
+      for (let i=0;i<cleaned.length;i+=2) b[i/2] = parseInt(cleaned.substr(i,2),16);
+      try {
+        await writeChar.writeValue(b);
+      } catch (e) {
+        alert("Write error: " + e);
+      }
+    }
+
+    // UI handlers
+    connectButton.addEventListener("click", connect);
+    disconnectButton.addEventListener("click", disconnect);
+    sendLiveBtn.addEventListener("click", sendLiveCmd);
+    clearRaw.addEventListener("click", () => recvRaw.innerHTML = "");
+    forceParse.addEventListener("click", () => {
+      if (!lastPacket) { alert("No packet available"); return; }
+      const parsed = parseLivePacket(lastPacket);
+      if (parsed.error) alert("Parse error: " + parsed.error);
+      else showParsed(parsed);
+    });
+    copyParsed.addEventListener("click", async () => {
+      const lines = [
+        `Battery mV: ${battery_mV.value}`,
+        `Min Hz: ${minHz.value}`,
+        `Max Hz: ${maxHz.value}`,
+        `Wave: ${waveVel.value}`,
+        `Pattern: ${pattern.value}`,
+        `Current mA: ${current_mA.value}`,
+        `Temp C: ${tempC.value}`,
+        `Days: ${days.value}`,
+        `HH:MM:SS: ${hhmmss.value}`
+      ].join("\n");
+      await navigator.clipboard.writeText(lines);
+      alert("Parsed copied to clipboard");
+    });
+
+    // availability check
+    if (!navigator.bluetooth) {
+      alert("Web Bluetooth not available in this browser.");
+      connectButton.disabled = true;
+    }
+  </script>
+</body>
+</html>

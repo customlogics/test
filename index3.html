@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web BLE LIVE parser (updated offsets)</title>
+  <title>Web BLE LIVE parser — V/kHz/temp scaling + auto</title>
   <style>
     body { font-family: Arial, sans-serif; margin:16px; }
     .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -14,15 +14,19 @@
     #recvRaw { height:160px; overflow:auto; border:1px solid #ccc; padding:8px; background:#111; color:#0f0; font-family:monospace; }
     #parsed { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin-top:8px; }
     button { padding:6px 10px; }
+    .status { font-weight:600; margin-left:6px; }
   </style>
 </head>
 <body>
-  <h3>Compact LIVE Data UI — updated offsets</h3>
+  <h3>Compact LIVE Data UI — scaled units + auto LIVE</h3>
 
   <div class="row">
     <button id="connectButton">Connect</button>
     <button id="disconnectButton" disabled>Disconnect</button>
     <button id="sendLiveBtn" disabled>SEND LIVE CMD</button>
+    <button id="startAutoBtn" disabled>AUTO LIVE (500ms)</button>
+    <button id="stopAutoBtn" disabled>STOP AUTO</button>
+    <span id="autoStatus" class="status">Idle</span>
   </div>
 
   <hr />
@@ -39,18 +43,18 @@
       </div>
     </div>
 
-    <div style="width:420px">
+    <div style="width:460px">
       <div class="box">
         <strong>LIVE Data (parsed)</strong>
         <div id="parsed">
-          <div><label>Battery (mV)</label><br><input id="battery_mV" class="small" type="number" readonly /></div>
-          <div><label>Current (mA)</label><br><input id="current_mA" class="small" type="number" readonly /></div>
-          <div><label>Temp</label><br><input id="tempC" class="small" type="number" readonly /></div>
-          <div><label>Min Freq (Hz)</label><br><input id="minHz" class="small" type="number" readonly /></div>
-          <div><label>Max Freq (Hz)</label><br><input id="maxHz" class="small" type="number" readonly /></div>
-          <div><label>Wave vel</label><br><input id="waveVel" class="small" type="number" readonly /></div>
-          <div><label>Pattern</label><br><input id="pattern" class="small" type="number" readonly /></div>
-          <div><label>Uptime Days</label><br><input id="days" class="small" type="number" readonly /></div>
+          <div><label>Battery</label><br><input id="battery_V" class="small" type="text" readonly /></div>
+          <div><label>Current (mA)</label><br><input id="current_mA" class="small" type="text" readonly /></div>
+          <div><label>Temp (°C)</label><br><input id="tempC" class="small" type="text" readonly /></div>
+          <div><label>Min Freq (kHz)</label><br><input id="minkHz" class="small" type="text" readonly /></div>
+          <div><label>Max Freq (kHz)</label><br><input id="maxkHz" class="small" type="text" readonly /></div>
+          <div><label>Wave vel</label><br><input id="waveVel" class="small" type="text" readonly /></div>
+          <div><label>Pattern</label><br><input id="pattern" class="small" type="text" readonly /></div>
+          <div><label>Uptime Days</label><br><input id="days" class="small" type="text" readonly /></div>
           <div><label>HH:MM:SS</label><br><input id="hhmmss" class="small" type="text" readonly /></div>
         </div>
         <div style="margin-top:8px;">
@@ -61,7 +65,7 @@
   </div>
 
   <script>
-    // UUIDs and LIVE command (unchanged)
+    // UUIDs and LIVE command
     const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
     const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
     const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
@@ -71,15 +75,18 @@
     const connectButton = document.getElementById("connectButton");
     const disconnectButton = document.getElementById("disconnectButton");
     const sendLiveBtn = document.getElementById("sendLiveBtn");
+    const startAutoBtn = document.getElementById("startAutoBtn");
+    const stopAutoBtn = document.getElementById("stopAutoBtn");
+    const autoStatus = document.getElementById("autoStatus");
     const recvRaw = document.getElementById("recvRaw");
     const clearRaw = document.getElementById("clearRaw");
     const forceParse = document.getElementById("forceParse");
 
-    const battery_mV = document.getElementById("battery_mV");
+    const battery_V = document.getElementById("battery_V");
     const current_mA = document.getElementById("current_mA");
     const tempC = document.getElementById("tempC");
-    const minHz = document.getElementById("minHz");
-    const maxHz = document.getElementById("maxHz");
+    const minkHz = document.getElementById("minkHz");
+    const maxkHz = document.getElementById("maxkHz");
     const waveVel = document.getElementById("waveVel");
     const pattern = document.getElementById("pattern");
     const days = document.getElementById("days");
@@ -89,6 +96,10 @@
     // BLE vars
     let device, server, notifyChar, writeChar;
     let lastPacket = null;
+
+    // auto-send control
+    let autoIntervalId = null;
+    let writeInProgress = false;
 
     function bytesToHexUpper(bytes) {
       return Array.from(bytes).map(b => b.toString(16).padStart(2,"0").toUpperCase()).join(" ");
@@ -101,7 +112,6 @@
       recvRaw.scrollTop = recvRaw.scrollHeight;
     }
 
-    // safe readers
     function readU8(buf, idx) { return (idx < buf.length) ? buf[idx] : null; }
     function readU16le(buf, lowIdx, highIdx) {
       const l = readU8(buf, lowIdx), h = readU8(buf, highIdx);
@@ -109,22 +119,15 @@
       return (h << 8) | l;
     }
 
-    // Updated parser using absolute indices (zero-indexed). If buffer shorter than needed,
-    // fallback to searching for "LIVE" tag and relative offsets (previous heuristic).
+    // parser using absolute indices (0-based) as you specified earlier
     function parseLivePacket(bytes) {
       const buf = Uint8Array.from(bytes);
-      // required highest index = 27
       const ABS_NEEDED = 28;
-      let useAbsolute = (buf.length >= ABS_NEEDED);
-
       let parsed = {};
-      if (useAbsolute) {
-        // Absolute indexes as provided by you:
-        // Battery: 10,11 ; Current:12,13 ; Temp:14,15 ; Min:16,17 ; Max:18,19 ;
-        // Wave:20,21 ; Pattern:22 ; Days:23,24 ; HH:25 ; MM:26 ; SS:27
+      if (buf.length >= ABS_NEEDED) {
         parsed.battery_mV = readU16le(buf, 10, 11);
-        parsed.current_mA = readU16le(buf, 12, 13); // treated as mA per your note
-        parsed.temp = readU16le(buf, 14, 15); // if temp is 8-bit in firmware, hi byte may be 0
+        parsed.current_mA_raw = readU16le(buf, 12, 13);
+        parsed.temp_raw = readU16le(buf, 14, 15);
         parsed.min_Hz = readU16le(buf, 16, 17);
         parsed.max_Hz = readU16le(buf, 18, 19);
         parsed.waveVal = readU16le(buf, 20, 21);
@@ -133,55 +136,64 @@
         parsed.hh = readU8(buf, 25);
         parsed.mm = readU8(buf, 26);
         parsed.ss = readU8(buf, 27);
-
         parsed.mode = "absolute";
         parsed.rawHex = bytesToHexUpper(buf);
         return parsed;
       }
 
-      // Fallback heuristic: search for ASCII "LIVE" and use previous relative offsets.
+      // fallback: search for ASCII "LIVE" and relative offsets (rare)
       let idx = -1;
       for (let i=0; i <= buf.length - 4; ++i) {
         if (buf[i] === 0x4C && buf[i+1] === 0x49 && buf[i+2] === 0x56 && buf[i+3] === 0x45) { idx = i; break; }
       }
       if (idx < 0) return { error: "LIVE tag not found and packet too short for absolute offsets." };
 
-      // relative offsets (as earlier heuristic) — adjust if needed later
       parsed.battery_mV = readU16le(buf, idx + 4, idx + 5);
       parsed.min_Hz = readU16le(buf, idx + 8, idx + 9);
       parsed.max_Hz = readU16le(buf, idx + 10, idx + 11);
       parsed.waveVal = readU16le(buf, idx + 12, idx + 13);
       parsed.pattern = readU8(buf, idx + 14);
-      parsed.current_mA = (readU16le(buf, idx + 15, idx + 16) !== null) ? readU16le(buf, idx + 15, idx + 16) : null;
-      parsed.temp = readU8(buf, idx + 17);
+      parsed.current_mA_raw = readU16le(buf, idx + 15, idx + 16);
+      parsed.temp_raw = readU8(buf, idx + 17);
       parsed.days = readU16le(buf, idx + 18, idx + 19);
       parsed.hh = readU8(buf, idx + 20);
       parsed.mm = readU8(buf, idx + 21);
       parsed.ss = readU8(buf, idx + 22);
-
       parsed.mode = "relative";
       parsed.rawHex = bytesToHexUpper(buf);
       return parsed;
     }
 
+    // scaled display:
     function showParsed(obj) {
       if (!obj || obj.error) {
-        battery_mV.value = ""; current_mA.value = ""; tempC.value = ""; minHz.value = "";
-        maxHz.value = ""; waveVel.value = ""; pattern.value = ""; days.value = ""; hhmmss.value = "";
+        battery_V.value = ""; current_mA.value = ""; tempC.value = ""; minkHz.value = ""; maxkHz.value = "";
+        waveVel.value = ""; pattern.value = ""; days.value = ""; hhmmss.value = "";
         return;
       }
-      battery_mV.value = (obj.battery_mV !== null && obj.battery_mV !== undefined) ? obj.battery_mV : "";
-      current_mA.value = (obj.current_mA !== null && obj.current_mA !== undefined) ? obj.current_mA : "";
-      tempC.value = (obj.temp !== null && obj.temp !== undefined) ? obj.temp : "";
-      minHz.value = (obj.min_Hz !== null && obj.min_Hz !== undefined) ? obj.min_Hz : "";
-      maxHz.value = (obj.max_Hz !== null && obj.max_Hz !== undefined) ? obj.max_Hz : "";
-      waveVel.value = (obj.waveVal !== null && obj.waveVal !== undefined) ? obj.waveVal : "";
-      pattern.value = (obj.pattern !== null && obj.pattern !== undefined) ? obj.pattern : "";
-      days.value = (obj.days !== null && obj.days !== undefined) ? obj.days : "";
+      // Battery: mV -> V (3 decimals)
+      if (obj.battery_mV != null) battery_V.value = (obj.battery_mV / 1000).toFixed(3) + " V";
+      else battery_V.value = "";
+
+      // Current: treat as mA (raw). show integer or two decimals if fractional
+      if (obj.current_mA_raw != null) current_mA.value = (obj.current_mA_raw).toString() + " mA";
+      else current_mA.value = "";
+
+      // Temp: divide by 100 (2 decimals)
+      if (obj.temp_raw != null) tempC.value = (obj.temp_raw / 100).toFixed(2) + " °C";
+      else tempC.value = "";
+
+      // Frequencies: Hz -> kHz (3 decimals)
+      if (obj.min_Hz != null) minkHz.value = (obj.min_Hz / 1000).toFixed(3) + " kHz"; else minkHz.value = "";
+      if (obj.max_Hz != null) maxkHz.value = (obj.max_Hz / 1000).toFixed(3) + " kHz"; else maxkHz.value = "";
+
+      waveVel.value = (obj.waveVal != null) ? obj.waveVal.toString() : "";
+      pattern.value = (obj.pattern != null) ? obj.pattern.toString() : "";
+      days.value = (obj.days != null) ? obj.days.toString() : "";
       hhmmss.value = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "";
     }
 
-    // BLE connection and handlers
+    // BLE connect
     async function connect() {
       try {
         device = await navigator.bluetooth.requestDevice({
@@ -199,6 +211,7 @@
         connectButton.disabled = true;
         disconnectButton.disabled = false;
         sendLiveBtn.disabled = false;
+        startAutoBtn.disabled = false;
       } catch (e) {
         alert("Connect failed: " + e);
       }
@@ -206,44 +219,87 @@
 
     async function disconnect() {
       try { if (device && device.gatt.connected) device.gatt.disconnect(); }
-      finally { connectButton.disabled = false; disconnectButton.disabled = true; sendLiveBtn.disabled = true; }
+      finally {
+        connectButton.disabled = false;
+        disconnectButton.disabled = true;
+        sendLiveBtn.disabled = true;
+        startAutoBtn.disabled = true;
+        stopAuto(); // ensure auto stopped
+      }
     }
 
     function onNotify(ev) {
       const arr = new Uint8Array(ev.target.value.buffer);
       appendRaw(arr);
-      // auto-parse
       const parsed = parseLivePacket(arr);
       if (!parsed.error) showParsed(parsed);
     }
 
-    async function sendLiveCmd() {
-      if (!writeChar) { alert("Not connected"); return; }
-      const cleaned = LIVE_CMD_HEX.replace(/0x/g, "").replace(/[^A-Fa-f0-9]/g,"");
-      const b = new Uint8Array(cleaned.length/2);
-      for (let i=0;i<cleaned.length;i+=2) b[i/2] = parseInt(cleaned.substr(i,2),16);
-      try { await writeChar.writeValue(b); }
-      catch (e) { alert("Write error: " + e); }
+    // Convert LIVE_CMD_HEX to Uint8Array
+    function hexToBytes(hexStr) {
+      const cleaned = hexStr.replace(/0x/g, "").replace(/[^A-Fa-f0-9]/g,"");
+      const out = new Uint8Array(cleaned.length / 2);
+      for (let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
+      return out;
     }
 
-    // UI handlers
+    async function sendLiveCmd() {
+      if (!writeChar) { console.warn("Not connected - cannot send"); return; }
+      if (writeInProgress) { console.warn("Write in progress - skipping this send"); return; }
+      const data = hexToBytes(LIVE_CMD_HEX);
+      try {
+        writeInProgress = true;
+        await writeChar.writeValue(data);
+      } catch (e) {
+        console.error("Write error:", e);
+      } finally {
+        writeInProgress = false;
+      }
+    }
+
+    // Auto start/stop
+    function startAuto() {
+      if (autoIntervalId !== null) return;
+      if (!writeChar) { alert("Not connected"); return; }
+      autoStatus.textContent = "Auto: ON";
+      startAutoBtn.disabled = true;
+      stopAutoBtn.disabled = false;
+      sendLiveBtn.disabled = false;
+      autoIntervalId = setInterval(() => {
+        // if prior write not done, skip to avoid collision
+        if (!writeInProgress) sendLiveCmd();
+      }, 500);
+    }
+
+    function stopAuto() {
+      if (autoIntervalId !== null) clearInterval(autoIntervalId);
+      autoIntervalId = null;
+      autoStatus.textContent = "Idle";
+      startAutoBtn.disabled = false;
+      stopAutoBtn.disabled = true;
+    }
+
+    // UI wiring
     connectButton.addEventListener("click", connect);
     disconnectButton.addEventListener("click", disconnect);
     sendLiveBtn.addEventListener("click", sendLiveCmd);
+    startAutoBtn.addEventListener("click", startAuto);
+    stopAutoBtn.addEventListener("click", stopAuto);
     clearRaw.addEventListener("click", () => recvRaw.innerHTML = "");
     forceParse.addEventListener("click", () => {
       if (!lastPacket) return alert("No packet available");
       const parsed = parseLivePacket(lastPacket);
-      if (parsed.error) alert(parsed.error); else showParsed(parsed);
+      if (parsed.error) alert(parsed.error);
+      else showParsed(parsed);
     });
 
     copyParsed.addEventListener("click", async () => {
       const lines = [
-        `Battery mV: ${battery_mV.value}`,
-        `Current mA: ${current_mA.value}`,
-        `Temp: ${tempC.value}`,
-        `Min Hz: ${minHz.value}`,
-        `Max Hz: ${maxHz.value}`,
+        `Battery (V): ${battery_V.value}`,
+        `Current (mA): ${current_mA.value}`,
+        `Temp (°C): ${tempC.value}`,
+        `Min (kHz): ${minkHz.value}`,
+        `Max (kHz): ${maxkHz.value}`,
         `Wave: ${waveVel.value}`,
         `Pattern: ${pattern.value}`,
         `Days: ${days.value}`,
@@ -253,9 +309,13 @@
       alert("Parsed copied to clipboard");
     });
 
+    // ensure auto stops on page unload
+    window.addEventListener("beforeunload", () => { stopAuto(); });
+
     if (!navigator.bluetooth) {
       alert("Web Bluetooth not available in this browser.");
       connectButton.disabled = true;
+      startAutoBtn.disabled = true;
     }
   </script>
 </body>

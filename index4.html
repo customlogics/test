@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Web BLE LIVE + INIT parser</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin:16px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    label { font-size:0.9rem; }
+    input[type="text"], input[type="number"] { padding:6px; font-family:monospace; }
+    input.small { width:120px; }
+    .box { border:1px solid #ddd; padding:8px; background:#fafafa; min-width:280px; }
+    #recvRaw { height:160px; overflow:auto; border:1px solid #ccc; padding:8px; background:#111; color:#0f0; font-family:monospace; }
+    #parsed { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin-top:8px; }
+    .featureGrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:center; }
+    .featureBox { border:1px solid #e5e5e5; padding:8px; background:#fff; }
+    button { padding:6px 10px; }
+    .status { font-weight:600; margin-left:6px; }
+  </style>
+</head>
+<body>
+  <h3>Web BLE LIVE + INIT — scaled units + auto LIVE + INIT parsing</h3>
+
+  <div class="row">
+    <button id="connectButton">Connect</button>
+    <button id="disconnectButton" disabled>Disconnect</button>
+
+    <!-- LIVE controls -->
+    <button id="sendLiveBtn" disabled>SEND LIVE</button>
+    <button id="startAutoBtn" disabled>AUTO LIVE (500ms)</button>
+    <button id="stopAutoBtn" disabled>STOP AUTO</button>
+    <span id="autoStatus" class="status">Idle</span>
+
+    <!-- INIT controls -->
+    <button id="sendInitBtn" disabled>SEND INIT</button>
+    <button id="forceParseInit" disabled>Parse last as INIT</button>
+  </div>
+
+  <hr />
+
+  <div style="display:flex;gap:12px;align-items:flex-start;">
+    <div style="flex:1">
+      <div class="box">
+        <strong>Raw Receive (Docklight hex)</strong>
+        <div id="recvRaw"></div>
+        <div style="margin-top:8px;">
+          <button id="clearRaw">Clear Raw</button>
+          <button id="forceParse">Parse latest (force LIVE)</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:640px">
+      <div class="box">
+        <strong>LIVE Data (parsed)</strong>
+        <div id="parsed">
+          <div><label>Battery</label><br><input id="battery_V" class="small" type="text" readonly /></div>
+          <div><label>Current (mA)</label><br><input id="current_mA" class="small" type="text" readonly /></div>
+          <div><label>Temp (°C)</label><br><input id="tempC" class="small" type="text" readonly /></div>
+          <div><label>Min Freq (kHz)</label><br><input id="minkHz" class="small" type="text" readonly /></div>
+          <div><label>Max Freq (kHz)</label><br><input id="maxkHz" class="small" type="text" readonly /></div>
+          <div><label>Wave vel</label><br><input id="waveVel" class="small" type="text" readonly /></div>
+          <div><label>Pattern</label><br><input id="pattern" class="small" type="text" readonly /></div>
+          <div><label>Uptime Days</label><br><input id="days" class="small" type="text" readonly /></div>
+          <div><label>HH:MM:SS</label><br><input id="hhmmss" class="small" type="text" readonly /></div>
+        </div>
+        <div style="margin-top:8px;">
+          <button id="copyParsed">Copy parsed (LIVE)</button>
+        </div>
+      </div>
+
+      <div class="box" style="margin-top:12px;">
+        <strong>INIT Data — Feature settings</strong>
+        <div class="featureGrid" style="margin-top:8px;">
+          <!-- 1: Audible beep -->
+          <div class="featureBox">
+            <strong>Audible beep</strong><br>
+            <label>Enabled</label><br><input id="beep_enabled" class="small" type="text" readonly />
+          </div>
+          <div class="featureBox">
+            <label>Set value</label><br><input id="beep_value" class="small" type="text" readonly />
+          </div>
+
+          <!-- 2: Standby mode -->
+          <div class="featureBox">
+            <strong>Standby mode</strong><br>
+            <label>Enabled</label><br><input id="standby_enabled" class="small" type="text" readonly />
+          </div>
+          <div class="featureBox">
+            <label>Set value</label><br><input id="standby_value" class="small" type="text" readonly />
+          </div>
+
+          <!-- 3: Shutdown mode -->
+          <div class="featureBox">
+            <strong>Shutdown mode</strong><br>
+            <label>Enabled</label><br><input id="shutdown_enabled" class="small" type="text" readonly />
+          </div>
+          <div class="featureBox">
+            <label>Set value</label><br><input id="shutdown_value" class="small" type="text" readonly />
+          </div>
+
+          <!-- 4: Audible Hiss band -->
+          <div class="featureBox">
+            <strong>Audible Hiss band</strong><br>
+            <label>Enabled</label><br><input id="hiss_enabled" class="small" type="text" readonly />
+          </div>
+          <div class="featureBox">
+            <label>Set value</label><br><input id="hiss_value" class="small" type="text" readonly />
+          </div>
+        </div>
+
+        <div style="margin-top:8px;">
+          <button id="copyInit">Copy parsed (INIT)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- unchanged UUIDs and commands ---
+    const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
+    const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
+    const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
+
+    const LIVE_CMD_HEX = "FD FC FB FA 04 00 4C 49 56 45 04 03 02 01";
+    const INIT_CMD_HEX = "FD FC FB FA 04 00 49 4E 49 54 04 03 02 01";
+
+    // --- DOM ---
+    const connectButton = document.getElementById("connectButton");
+    const disconnectButton = document.getElementById("disconnectButton");
+
+    const sendLiveBtn = document.getElementById("sendLiveBtn");
+    const startAutoBtn = document.getElementById("startAutoBtn");
+    const stopAutoBtn = document.getElementById("stopAutoBtn");
+    const autoStatus = document.getElementById("autoStatus");
+
+    const sendInitBtn = document.getElementById("sendInitBtn");
+    const forceParseInit = document.getElementById("forceParseInit");
+
+    const recvRaw = document.getElementById("recvRaw");
+    const clearRaw = document.getElementById("clearRaw");
+    const forceParse = document.getElementById("forceParse");
+
+    // LIVE parsed fields
+    const battery_V = document.getElementById("battery_V");
+    const current_mA = document.getElementById("current_mA");
+    const tempC = document.getElementById("tempC");
+    const minkHz = document.getElementById("minkHz");
+    const maxkHz = document.getElementById("maxkHz");
+    const waveVel = document.getElementById("waveVel");
+    const pattern = document.getElementById("pattern");
+    const days = document.getElementById("days");
+    const hhmmss = document.getElementById("hhmmss");
+    const copyParsed = document.getElementById("copyParsed");
+
+    // INIT parsed fields (features)
+    const beep_enabled = document.getElementById("beep_enabled");
+    const beep_value = document.getElementById("beep_value");
+    const standby_enabled = document.getElementById("standby_enabled");
+    const standby_value = document.getElementById("standby_value");
+    const shutdown_enabled = document.getElementById("shutdown_enabled");
+    const shutdown_value = document.getElementById("shutdown_value");
+    const hiss_enabled = document.getElementById("hiss_enabled");
+    const hiss_value = document.getElementById("hiss_value");
+    const copyInit = document.getElementById("copyInit");
+
+    // --- BLE state ---
+    let device, server, notifyChar, writeChar;
+    let lastPacket = null;
+
+    // auto send control
+    let autoIntervalId = null;
+    let writeInProgress = false;
+
+    // helper: convert bytes to hex
+    function bytesToHexUpper(bytes) {
+      return Array.from(bytes).map(b => b.toString(16).padStart(2,"0").toUpperCase()).join(" ");
+    }
+
+    function appendRaw(bytes) {
+      const t = new Date().toLocaleTimeString();
+      lastPacket = bytes;
+      recvRaw.innerHTML += `[${t}] ${bytesToHexUpper(bytes)}<br>`;
+      recvRaw.scrollTop = recvRaw.scrollHeight;
+    }
+
+    function readU8(buf, idx) { return (idx < buf.length) ? buf[idx] : null; }
+    function readU16le(buf, lowIdx, highIdx) {
+      const l = readU8(buf, lowIdx), h = readU8(buf, highIdx);
+      if (l === null || h === null) return null;
+      return (h << 8) | l;
+    }
+
+    // LIVE parser (unchanged semantics)
+    function parseLivePacket(bytes) {
+      const buf = Uint8Array.from(bytes);
+      const ABS_NEEDED = 28;
+      let parsed = {};
+      if (buf.length >= ABS_NEEDED) {
+        parsed.battery_mV = readU16le(buf, 10, 11);
+        parsed.current_mA_raw = readU16le(buf, 12, 13);
+        parsed.temp_raw = readU16le(buf, 14, 15);
+        parsed.min_Hz = readU16le(buf, 16, 17);
+        parsed.max_Hz = readU16le(buf, 18, 19);
+        parsed.waveVal = readU16le(buf, 20, 21);
+        parsed.pattern = readU8(buf, 22);
+        parsed.days = readU16le(buf, 23, 24);
+        parsed.hh = readU8(buf, 25);
+        parsed.mm = readU8(buf, 26);
+        parsed.ss = readU8(buf, 27);
+        parsed.mode = "absolute";
+        parsed.rawHex = bytesToHexUpper(buf);
+        return parsed;
+      }
+
+      // fallback: search "LIVE"
+      let idx = -1;
+      for (let i=0; i <= buf.length - 4; ++i) {
+        if (buf[i] === 0x4C && buf[i+1] === 0x49 && buf[i+2] === 0x56 && buf[i+3] === 0x45) { idx = i; break; }
+      }
+      if (idx < 0) return { error: "LIVE tag not found and packet too short for absolute offsets." };
+
+      parsed.battery_mV = readU16le(buf, idx + 4, idx + 5);
+      parsed.min_Hz = readU16le(buf, idx + 8, idx + 9);
+      parsed.max_Hz = readU16le(buf, idx + 10, idx + 11);
+      parsed.waveVal = readU16le(buf, idx + 12, idx + 13);
+      parsed.pattern = readU8(buf, idx + 14);
+      parsed.current_mA_raw = readU16le(buf, idx + 15, idx + 16);
+      parsed.temp_raw = readU8(buf, idx + 17);
+      parsed.days = readU16le(buf, idx + 18, idx + 19);
+      parsed.hh = readU8(buf, idx + 20);
+      parsed.mm = readU8(buf, idx + 21);
+      parsed.ss = readU8(buf, idx + 22);
+      parsed.mode = "relative";
+      parsed.rawHex = bytesToHexUpper(buf);
+      return parsed;
+    }
+
+    // show LIVE scaled values
+    function showLive(obj) {
+      if (!obj || obj.error) {
+        battery_V.value = ""; current_mA.value = ""; tempC.value = ""; minkHz.value = ""; maxkHz.value = "";
+        waveVel.value = ""; pattern.value = ""; days.value = ""; hhmmss.value = "";
+        return;
+      }
+      battery_V.value = (obj.battery_mV != null) ? (obj.battery_mV / 1000).toFixed(3) + " V" : "";
+      current_mA.value = (obj.current_mA_raw != null) ? (obj.current_mA_raw).toString() + " mA" : "";
+      tempC.value = (obj.temp_raw != null) ? (obj.temp_raw / 100).toFixed(2) + " °C" : "";
+      minkHz.value = (obj.min_Hz != null) ? (obj.min_Hz / 1000).toFixed(3) + " kHz" : "";
+      maxkHz.value = (obj.max_Hz != null) ? (obj.max_Hz / 1000).toFixed(3) + " kHz" : "";
+      waveVel.value = (obj.waveVal != null) ? obj.waveVal.toString() : "";
+      pattern.value = (obj.pattern != null) ? obj.pattern.toString() : "";
+      days.value = (obj.days != null) ? obj.days.toString() : "";
+      hhmmss.value = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "";
+    }
+
+    // INIT parser using exact indices you provided:
+    // en bytes: 11,21,31,41
+    // set value LE: (13,14), (23,24), (33,34), (43,44)
+    function parseInitPacket(bytes) {
+      const buf = Uint8Array.from(bytes);
+      // we need at least byte index 44 -> length 45
+      if (buf.length < 45) {
+        // try to find "INIT" tag and if found attempt offsets relative to it (but user prefers absolute indices)
+        let idx = -1;
+        for (let i=0; i <= buf.length - 4; ++i) {
+          if (buf[i] === 0x49 && buf[i+1] === 0x4E && buf[i+2] === 0x49 && buf[i+3] === 0x54) { idx = i; break; }
+        }
+        if (idx < 0) return { error: "INIT not found and packet too short for absolute INIT offsets." };
+        // if found do a best-effort using relative positions (assuming positions shift) - but prefer absolute.
+        return { error: "Packet short for absolute INIT parse; INIT tag found but absolute positions required." };
+      }
+
+      const beep_en = readU8(buf, 11);
+      const beep_val = readU16le(buf, 13, 14);
+
+      const standby_en = readU8(buf, 21);
+      const standby_val = readU16le(buf, 23, 24);
+
+      const shutdown_en = readU8(buf, 31);
+      const shutdown_val = readU16le(buf, 33, 34);
+
+      const hiss_en = readU8(buf, 41);
+      const hiss_val = readU16le(buf, 43, 44);
+
+      return {
+        beep: { enabled: (beep_en === 1), value: beep_val },
+        standby: { enabled: (standby_en === 1), value: standby_val },
+        shutdown: { enabled: (shutdown_en === 1), value: shutdown_val },
+        hiss: { enabled: (hiss_en === 1), value: hiss_val },
+        rawHex: bytesToHexUpper(buf)
+      };
+    }
+
+    // show INIT parsed fields
+    function showInit(obj) {
+      if (!obj || obj.error) {
+        beep_enabled.value = ""; beep_value.value = "";
+        standby_enabled.value = ""; standby_value.value = "";
+        shutdown_enabled.value = ""; shutdown_value.value = "";
+        hiss_enabled.value = ""; hiss_value.value = "";
+        return;
+      }
+      beep_enabled.value = obj.beep.enabled ? "Enabled" : "Disabled";
+      beep_value.value = (obj.beep.value != null) ? obj.beep.value.toString() : "";
+
+      standby_enabled.value = obj.standby.enabled ? "Enabled" : "Disabled";
+      standby_value.value = (obj.standby.value != null) ? obj.standby.value.toString() : "";
+
+      shutdown_enabled.value = obj.shutdown.enabled ? "Enabled" : "Disabled";
+      shutdown_value.value = (obj.shutdown.value != null) ? obj.shutdown.value.toString() : "";
+
+      hiss_enabled.value = obj.hiss.enabled ? "Enabled" : "Disabled";
+      hiss_value.value = (obj.hiss.value != null) ? obj.hiss.value.toString() : "";
+    }
+
+    // --- BLE connect / notify handling ---
+    async function connect() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: "CARCAT" }, { name: "CARCAT_5G" }],
+          optionalServices: [serviceUuid],
+        });
+        server = await device.gatt.connect();
+        const svc = await server.getPrimaryService(serviceUuid);
+        notifyChar = await svc.getCharacteristic(notifyCharUuid);
+        writeChar = await svc.getCharacteristic(writeCharUuid);
+
+        await notifyChar.startNotifications();
+        notifyChar.addEventListener("characteristicvaluechanged", onNotify);
+
+        connectButton.disabled = true;
+        disconnectButton.disabled = false;
+        sendLiveBtn.disabled = false;
+        startAutoBtn.disabled = false;
+        sendInitBtn.disabled = false;
+        forceParseInit.disabled = false;
+      } catch (e) {
+        alert("Connect failed: " + e);
+      }
+    }
+
+    async function disconnect() {
+      try { if (device && device.gatt.connected) device.gatt.disconnect(); }
+      finally {
+        connectButton.disabled = false;
+        disconnectButton.disabled = true;
+        sendLiveBtn.disabled = true;
+        startAutoBtn.disabled = true;
+        stopAuto();
+        sendInitBtn.disabled = true;
+        forceParseInit.disabled = true;
+      }
+    }
+
+    function onNotify(ev) {
+      const arr = new Uint8Array(ev.target.value.buffer);
+      appendRaw(arr);
+
+      // Try parsing LIVE (if present)
+      try {
+        const liveParsed = parseLivePacket(arr);
+        if (!liveParsed.error) showLive(liveParsed);
+      } catch (e) {
+        console.warn("LIVE parse error:", e);
+      }
+
+      // Try parsing INIT (if present)
+      try {
+        // detect by "INIT" tag or buffer length
+        let initDetected = false;
+        if (arr.length >= 45) initDetected = true;
+        else {
+          // look for ASCII "INIT"
+          for (let i=0;i<=arr.length-4;i++) {
+            if (arr[i] === 0x49 && arr[i+1] === 0x4E && arr[i+2] === 0x49 && arr[i+3] === 0x54) { initDetected = true; break; }
+          }
+        }
+        if (initDetected) {
+          const initParsed = parseInitPacket(arr);
+          if (!initParsed.error) showInit(initParsed);
+        }
+      } catch (e) {
+        console.warn("INIT parse error:", e);
+      }
+    }
+
+    // write helper
+    function hexToBytes(hexStr) {
+      const cleaned = hexStr.replace(/0x/g, "").replace(/[^A-Fa-f0-9]/g,"");
+      const out = new Uint8Array(cleaned.length / 2);
+      for (let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
+      return out;
+    }
+
+    async function sendLiveCmd() {
+      if (!writeChar) { console.warn("Not connected - cannot send"); return; }
+      if (writeInProgress) { console.warn("Write in progress - skipping"); return; }
+      const data = hexToBytes(LIVE_CMD_HEX);
+      try {
+        writeInProgress = true;
+        await writeChar.writeValue(data);
+      } catch (e) { console.error("Write error:", e); }
+      finally { writeInProgress = false; }
+    }
+
+    async function sendInitCmd() {
+      if (!writeChar) { console.warn("Not connected - cannot send INIT"); return; }
+      if (writeInProgress) { console.warn("Write in progress - skipping INIT"); return; }
+      const data = hexToBytes(INIT_CMD_HEX);
+      try {
+        writeInProgress = true;
+        await writeChar.writeValue(data);
+      } catch (e) { console.error("INIT write error:", e); }
+      finally { writeInProgress = false; }
+    }
+
+    // Auto start/stop for LIVE (unchanged)
+    function startAuto() {
+      if (autoIntervalId !== null) return;
+      if (!writeChar) { alert("Not connected"); return; }
+      autoStatus.textContent = "Auto: ON";
+      startAutoBtn.disabled = true;
+      stopAutoBtn.disabled = false;
+      sendLiveBtn.disabled = false;
+      autoIntervalId = setInterval(() => {
+        if (!writeInProgress) sendLiveCmd();
+      }, 500);
+    }
+
+    function stopAuto() {
+      if (autoIntervalId !== null) clearInterval(autoIntervalId);
+      autoIntervalId = null;
+      autoStatus.textContent = "Idle";
+      startAutoBtn.disabled = false;
+      stopAutoBtn.disabled = true;
+    }
+
+    // UI wiring
+    connectButton.addEventListener("click", connect);
+    disconnectButton.addEventListener("click", disconnect);
+
+    sendLiveBtn.addEventListener("click", sendLiveCmd);
+    startAutoBtn.addEventListener("click", startAuto);
+    stopAutoBtn.addEventListener("click", stopAuto);
+
+    sendInitBtn.addEventListener("click", sendInitCmd);
+
+    clearRaw.addEventListener("click", () => recvRaw.innerHTML = "");
+    forceParse.addEventListener("click", () => {
+      if (!lastPacket) return alert("No packet available");
+      const parsed = parseLivePacket(lastPacket);
+      if (parsed.error) alert(parsed.error); else showLive(parsed);
+    });
+    forceParseInit.addEventListener("click", () => {
+      if (!lastPacket) return alert("No packet available");
+      const parsed = parseInitPacket(lastPacket);
+      if (parsed.error) alert(parsed.error); else showInit(parsed);
+    });
+
+    copyParsed.addEventListener("click", async () => {
+      const lines = [
+        `Battery (V): ${battery_V.value}`,
+        `Current (mA): ${current_mA.value}`,
+        `Temp (°C): ${tempC.value}`,
+        `Min (kHz): ${minkHz.value}`,
+        `Max (kHz): ${maxkHz.value}`,
+        `Wave: ${waveVel.value}`,
+        `Pattern: ${pattern.value}`,
+        `Days: ${days.value}`,
+        `HH:MM:SS: ${hhmmss.value}`
+      ].join("\n");
+      await navigator.clipboard.writeText(lines);
+      alert("LIVE parsed copied to clipboard");
+    });
+
+    copyInit.addEventListener("click", async () => {
+      const lines = [
+        `Audible beep: ${beep_enabled.value} , set=${beep_value.value}`,
+        `Standby mode: ${standby_enabled.value} , set=${standby_value.value}`,
+        `Shutdown mode: ${shutdown_enabled.value} , set=${shutdown_value.value}`,
+        `Audible Hiss band: ${hiss_enabled.value} , set=${hiss_value.value}`
+      ].join("\n");
+      await navigator.clipboard.writeText(lines);
+      alert("INIT parsed copied to clipboard");
+    });
+
+    // cleanup
+    window.addEventListener("beforeunload", () => { stopAuto(); });
+
+    if (!navigator.bluetooth) {
+      alert("Web Bluetooth not available in this browser.");
+      connectButton.disabled = true;
+      startAutoBtn.disabled = true;
+      sendInitBtn.disabled = true;
+      forceParseInit.disabled = true;
+    }
+  </script>
+</body>
+</html>

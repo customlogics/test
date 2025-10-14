@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web BLE LIVE + INIT — extended INIT fields</title>
+  <title>Web BLE LIVE + INIT — fixed tag detection (bytes 6-9)</title>
   <style>
     body { font-family: Arial, sans-serif; margin:16px; }
     .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -21,7 +21,7 @@
   </style>
 </head>
 <body>
-  <h3>Web BLE LIVE + INIT — extended INIT fields</h3>
+  <h3>Web BLE LIVE + INIT — fixed tag detection (bytes 6–9)</h3>
 
   <div class="row">
     <button id="connectButton">Connect</button>
@@ -47,7 +47,7 @@
         <div id="recvRaw"></div>
         <div style="margin-top:8px;">
           <button id="clearRaw">Clear Raw</button>
-          <button id="forceParse">Parse latest (force LIVE)</button>
+          <button id="forceParse" title="Force parse as LIVE">Parse latest (force LIVE)</button>
         </div>
       </div>
     </div>
@@ -311,49 +311,34 @@
       return (h << 8) | l;
     }
 
-    // LIVE parser (unchanged)
+    // Strict tag check helper: checks tagStr at offset (zero-indexed)
+    function isTagAt(buf, offset, tagStr) {
+      if (!buf || buf.length < offset + tagStr.length) return false;
+      for (let i = 0; i < tagStr.length; ++i) {
+        if (buf[offset + i] !== tagStr.charCodeAt(i)) return false;
+      }
+      return true;
+    }
+
+    // LIVE parser (absolute offsets only)
     function parseLivePacket(bytes) {
       const buf = Uint8Array.from(bytes);
       const ABS_NEEDED = 28;
-      let parsed = {};
-      if (buf.length >= ABS_NEEDED) {
-        parsed.battery_mV = readU16le(buf, 10, 11);
-        parsed.current_mA_raw = readU16le(buf, 12, 13);
-        parsed.temp_raw = readU16le(buf, 14, 15);
-        parsed.min_Hz = readU16le(buf, 16, 17);
-        parsed.max_Hz = readU16le(buf, 18, 19);
-        parsed.waveVal = readU16le(buf, 20, 21);
-        parsed.pattern = readU8(buf, 22);
-        parsed.days = readU16le(buf, 23, 24);
-        parsed.hh = readU8(buf, 25);
-        parsed.mm = readU8(buf, 26);
-        parsed.ss = readU8(buf, 27);
-        parsed.mode = "absolute";
-        parsed.rawHex = bytesToHexUpper(buf);
-        return parsed;
-      }
-
-      // fallback: look for "LIVE" tag
-      let idx = -1;
-      for (let i=0; i <= buf.length - 4; ++i) {
-        if (buf[i] === 0x4C && buf[i+1] === 0x49 && buf[i+2] === 0x56 && buf[i+3] === 0x45) { idx = i; break; }
-      }
-      if (idx < 0) return { error: "LIVE tag not found and packet too short for absolute offsets." };
-
-      parsed.battery_mV = readU16le(buf, idx + 4, idx + 5);
-      parsed.min_Hz = readU16le(buf, idx + 8, idx + 9);
-      parsed.max_Hz = readU16le(buf, idx + 10, idx + 11);
-      parsed.waveVal = readU16le(buf, idx + 12, idx + 13);
-      parsed.pattern = readU8(buf, idx + 14);
-      parsed.current_mA_raw = readU16le(buf, idx + 15, idx + 16);
-      parsed.temp_raw = readU8(buf, idx + 17);
-      parsed.days = readU16le(buf, idx + 18, idx + 19);
-      parsed.hh = readU8(buf, idx + 20);
-      parsed.mm = readU8(buf, idx + 21);
-      parsed.ss = readU8(buf, idx + 22);
-      parsed.mode = "relative";
-      parsed.rawHex = bytesToHexUpper(buf);
-      return parsed;
+      if (buf.length < ABS_NEEDED) return { error: "LIVE packet too short" };
+      return {
+        battery_mV: readU16le(buf, 10, 11),
+        current_mA_raw: readU16le(buf, 12, 13),
+        temp_raw: readU16le(buf, 14, 15),
+        min_Hz: readU16le(buf, 16, 17),
+        max_Hz: readU16le(buf, 18, 19),
+        waveVal: readU16le(buf, 20, 21),
+        pattern: readU8(buf, 22),
+        days: readU16le(buf, 23, 24),
+        hh: readU8(buf, 25),
+        mm: readU8(buf, 26),
+        ss: readU8(buf, 27),
+        rawHex: bytesToHexUpper(buf)
+      };
     }
 
     function showLive(obj) {
@@ -373,21 +358,11 @@
       hhmmss.value = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "";
     }
 
-    // INIT parser — reads all set + defaults + slider min/max/defaults (absolute indices)
-    // Required minimum buffer length: 51 (highest index used = 50)
+    // INIT parser — absolute offsets per your spec (needs 51 bytes)
     function parseInitPacket(bytes) {
       const buf = Uint8Array.from(bytes);
-      if (buf.length < 51) {
-        // fallback: try to detect INIT tag but prefer absolute parse
-        let idx = -1;
-        for (let i=0; i <= buf.length - 4; ++i) {
-          if (buf[i] === 0x49 && buf[i+1] === 0x4E && buf[i+2] === 0x49 && buf[i+3] === 0x54) { idx = i; break; }
-        }
-        if (idx < 0) return { error: "INIT not found and packet too short for absolute INIT offsets (need 51 bytes)." };
-        return { error: "INIT tag found but packet too short for absolute INIT offsets; provide full frame for absolute parsing." };
-      }
+      if (buf.length < 51) return { error: "INIT packet too short (need ≥51 bytes)" };
 
-      // Read enable bytes & values
       const beep_en = readU8(buf, 11);
       const beep_en_default = readU8(buf, 12);
       const beep_val = readU16le(buf, 13, 14);
@@ -419,7 +394,7 @@
       return {
         beep: {
           enabled: (beep_en === 1),
-          en_default: beep_en_default === 1,
+          en_default: (beep_en_default === 1),
           value: beep_val,
           min: beep_min,
           max: beep_max,
@@ -427,7 +402,7 @@
         },
         standby: {
           enabled: (standby_en === 1),
-          en_default: standby_en_default === 1,
+          en_default: (standby_en_default === 1),
           value_mV: standby_val,
           min_mV: standby_minv,
           max_mV: standby_maxv,
@@ -435,7 +410,7 @@
         },
         shutdown: {
           enabled: (shutdown_en === 1),
-          en_default: shutdown_en_default === 1,
+          en_default: (shutdown_en_default === 1),
           value_mV: shutdown_val,
           min_mV: shutdown_minv,
           max_mV: shutdown_maxv,
@@ -443,7 +418,7 @@
         },
         hiss: {
           enabled: (hiss_en === 1),
-          en_default: hiss_en_default === 1,
+          en_default: (hiss_en_default === 1),
           value_pct: hiss_val,
           min_pct: hiss_minv,
           max_pct: hiss_maxv,
@@ -453,10 +428,9 @@
       };
     }
 
-    // show INIT fields converting units as requested
+    // show INIT with conversions (beep seconds raw, standby/shutdown mV->V, hiss %)
     function showInit(obj) {
       if (!obj || obj.error) {
-        // clear all INIT UI
         [beep_enabled, beep_en_default, beep_value, beep_min, beep_max, beep_default,
          standby_enabled, standby_en_default, standby_value, standby_min, standby_max, standby_default,
          shutdown_enabled, shutdown_en_default, shutdown_value, shutdown_min, shutdown_max, shutdown_default,
@@ -464,7 +438,6 @@
         return;
       }
 
-      // beep: seconds (raw) — user requested NOT to divide by 1000
       beep_enabled.value = obj.beep.enabled ? "Enabled" : "Disabled";
       beep_en_default.value = obj.beep.en_default ? "Enabled" : "Disabled";
       beep_value.value = (obj.beep.value != null) ? `${obj.beep.value} s` : "";
@@ -476,7 +449,6 @@
       beep_default.value = (obj.beep.def != null) ? `${obj.beep.def} s` : "";
       beep_default.title = `raw=${obj.beep.def}`;
 
-      // standby: convert mV -> V (3 decimals)
       standby_enabled.value = obj.standby.enabled ? "Enabled" : "Disabled";
       standby_en_default.value = obj.standby.en_default ? "Enabled" : "Disabled";
       standby_value.value = (obj.standby.value_mV != null) ? `${(obj.standby.value_mV/1000).toFixed(3)} V` : "";
@@ -488,7 +460,6 @@
       standby_default.value = (obj.standby.def_mV != null) ? `${(obj.standby.def_mV/1000).toFixed(3)} V` : "";
       standby_default.title = `raw mV=${obj.standby.def_mV}`;
 
-      // shutdown: convert mV -> V
       shutdown_enabled.value = obj.shutdown.enabled ? "Enabled" : "Disabled";
       shutdown_en_default.value = obj.shutdown.en_default ? "Enabled" : "Disabled";
       shutdown_value.value = (obj.shutdown.value_mV != null) ? `${(obj.shutdown.value_mV/1000).toFixed(3)} V` : "";
@@ -500,7 +471,6 @@
       shutdown_default.value = (obj.shutdown.def_mV != null) ? `${(obj.shutdown.def_mV/1000).toFixed(3)} V` : "";
       shutdown_default.title = `raw mV=${obj.shutdown.def_mV}`;
 
-      // hiss: percent (%) integers
       hiss_enabled.value = obj.hiss.enabled ? "Enabled" : "Disabled";
       hiss_en_default.value = obj.hiss.en_default ? "Enabled" : "Disabled";
       hiss_value.value = (obj.hiss.value_pct != null) ? `${obj.hiss.value_pct} %` : "";
@@ -513,7 +483,51 @@
       hiss_default.title = `raw=${obj.hiss.def_pct}`;
     }
 
-    // BLE connect & handler (preserves previous behavior)
+    // hex -> bytes helper
+    function hexToBytes(hexStr) {
+      const cleaned = hexStr.replace(/0x/g, "").replace(/[^A-Fa-f0-9]/g,"");
+      const out = new Uint8Array(cleaned.length / 2);
+      for (let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
+      return out;
+    }
+
+    // send helpers (unchanged)
+    async function sendLiveCmd() {
+      if (!writeChar) { console.warn("Not connected - cannot send"); return; }
+      if (writeInProgress) { console.warn("Write in progress - skipping"); return; }
+      const data = hexToBytes(LIVE_CMD_HEX);
+      try { writeInProgress = true; await writeChar.writeValue(data); }
+      catch (e) { console.error("Write error:", e); }
+      finally { writeInProgress = false; }
+    }
+
+    async function sendInitCmd() {
+      if (!writeChar) { console.warn("Not connected - cannot send INIT"); return; }
+      if (writeInProgress) { console.warn("Write in progress - skipping INIT"); return; }
+      const data = hexToBytes(INIT_CMD_HEX);
+      try { writeInProgress = true; await writeChar.writeValue(data); }
+      catch (e) { console.error("INIT write error:", e); }
+      finally { writeInProgress = false; }
+    }
+
+    // auto LIVE
+    function startAuto() {
+      if (autoIntervalId !== null) return;
+      if (!writeChar) { alert("Not connected"); return; }
+      autoStatus.textContent = "Auto: ON";
+      startAutoBtn.disabled = true;
+      stopAutoBtn.disabled = false;
+      autoIntervalId = setInterval(() => { if (!writeInProgress) sendLiveCmd(); }, 500);
+    }
+    function stopAuto() {
+      if (autoIntervalId !== null) clearInterval(autoIntervalId);
+      autoIntervalId = null;
+      autoStatus.textContent = "Idle";
+      startAutoBtn.disabled = false;
+      stopAutoBtn.disabled = true;
+    }
+
+    // CONNECT / NOTIFY
     async function connect() {
       try {
         device = await navigator.bluetooth.requestDevice({
@@ -552,86 +566,46 @@
       }
     }
 
+    // MAIN notify handler: strict checks for tag at bytes 6..9
     function onNotify(ev) {
       const arr = new Uint8Array(ev.target.value.buffer);
       appendRaw(arr);
 
-      // Try parse LIVE
       try {
-        const liveParsed = parseLivePacket(arr);
-        if (!liveParsed.error) showLive(liveParsed);
-      } catch (e) {
-        console.warn("LIVE parse error:", e);
-      }
-
-      // Try parse INIT if present (we require full length for absolute parsing)
-      try {
-        let initDetected = false;
-        if (arr.length >= 51) initDetected = true;
-        else {
-          for (let i=0;i<=arr.length-4;i++) {
-            if (arr[i] === 0x49 && arr[i+1] === 0x4E && arr[i+2] === 0x49 && arr[i+3] === 0x54) { initDetected = true; break; }
-          }
+        // only parse LIVE if 'LIVE' at bytes 6..9 and packet long enough
+        if (isTagAt(arr, 6, "LIVE") && arr.length >= 28) {
+          const liveParsed = parseLivePacket(arr);
+          if (!liveParsed.error) showLive(liveParsed);
+          return; // prefer LIVE over INIT if both somehow present
         }
-        if (initDetected) {
+
+        // only parse INIT if 'INIT' at bytes 6..9 and packet long enough
+        if (isTagAt(arr, 6, "INIT") && arr.length >= 51) {
           const initParsed = parseInitPacket(arr);
           if (!initParsed.error) showInit(initParsed);
-          else console.warn("INIT parse skipped:", initParsed.error);
+          return;
         }
+
+        // no strict tag found at bytes 6..9 — ignore to avoid mis-parsing
       } catch (e) {
-        console.warn("INIT parse error:", e);
+        console.warn("parse error:", e);
       }
     }
 
-    // helpers: hex -> bytes
-    function hexToBytes(hexStr) {
-      const cleaned = hexStr.replace(/0x/g, "").replace(/[^A-Fa-f0-9]/g,"");
-      const out = new Uint8Array(cleaned.length / 2);
-      for (let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
-      return out;
+    // force parse buttons now require tag at 6..9 (or they'll warn)
+    function forceParseLive() {
+      if (!lastPacket) return alert("No packet available");
+      if (!isTagAt(lastPacket, 6, "LIVE")) return alert("Latest packet does not have 'LIVE' at bytes 6..9 — parsing skipped.");
+      if (lastPacket.length < 28) return alert("LIVE packet too short (need ≥28 bytes).");
+      const parsed = parseLivePacket(lastPacket);
+      if (parsed.error) alert(parsed.error); else showLive(parsed);
     }
-
-    async function sendLiveCmd() {
-      if (!writeChar) { console.warn("Not connected - cannot send"); return; }
-      if (writeInProgress) { console.warn("Write in progress - skipping"); return; }
-      const data = hexToBytes(LIVE_CMD_HEX);
-      try {
-        writeInProgress = true;
-        await writeChar.writeValue(data);
-      } catch (e) { console.error("Write error:", e); }
-      finally { writeInProgress = false; }
-    }
-
-    async function sendInitCmd() {
-      if (!writeChar) { console.warn("Not connected - cannot send INIT"); return; }
-      if (writeInProgress) { console.warn("Write in progress - skipping INIT"); return; }
-      const data = hexToBytes(INIT_CMD_HEX);
-      try {
-        writeInProgress = true;
-        await writeChar.writeValue(data);
-      } catch (e) { console.error("INIT write error:", e); }
-      finally { writeInProgress = false; }
-    }
-
-    // auto LIVE controls
-    function startAuto() {
-      if (autoIntervalId !== null) return;
-      if (!writeChar) { alert("Not connected"); return; }
-      autoStatus.textContent = "Auto: ON";
-      startAutoBtn.disabled = true;
-      stopAutoBtn.disabled = false;
-      sendLiveBtn.disabled = false;
-      autoIntervalId = setInterval(() => {
-        if (!writeInProgress) sendLiveCmd();
-      }, 500);
-    }
-
-    function stopAuto() {
-      if (autoIntervalId !== null) clearInterval(autoIntervalId);
-      autoIntervalId = null;
-      autoStatus.textContent = "Idle";
-      startAutoBtn.disabled = false;
-      stopAutoBtn.disabled = true;
+    function forceParseInitFn() {
+      if (!lastPacket) return alert("No packet available");
+      if (!isTagAt(lastPacket, 6, "INIT")) return alert("Latest packet does not have 'INIT' at bytes 6..9 — parsing skipped.");
+      if (lastPacket.length < 51) return alert("INIT packet too short (need ≥51 bytes).");
+      const parsed = parseInitPacket(lastPacket);
+      if (parsed.error) alert(parsed.error); else showInit(parsed);
     }
 
     // UI wiring
@@ -645,16 +619,8 @@
     sendInitBtn.addEventListener("click", sendInitCmd);
 
     clearRaw.addEventListener("click", () => recvRaw.innerHTML = "");
-    forceParse.addEventListener("click", () => {
-      if (!lastPacket) return alert("No packet available");
-      const parsed = parseLivePacket(lastPacket);
-      if (parsed.error) alert(parsed.error); else showLive(parsed);
-    });
-    forceParseInit.addEventListener("click", () => {
-      if (!lastPacket) return alert("No packet available");
-      const parsed = parseInitPacket(lastPacket);
-      if (parsed.error) alert(parsed.error); else showInit(parsed);
-    });
+    forceParse.addEventListener("click", forceParseLive);
+    forceParseInit.addEventListener("click", forceParseInitFn);
 
     copyParsed.addEventListener("click", async () => {
       const lines = [

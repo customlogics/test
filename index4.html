@@ -3,24 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web BLE LIVE + INIT — scaled units</title>
+  <title>Web BLE LIVE + INIT — extended INIT fields</title>
   <style>
     body { font-family: Arial, sans-serif; margin:16px; }
     .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     label { font-size:0.9rem; }
     input[type="text"], input[type="number"] { padding:6px; font-family:monospace; }
     input.small { width:120px; }
-    .box { border:1px solid #ddd; padding:8px; background:#fafafa; min-width:280px; }
-    #recvRaw { height:160px; overflow:auto; border:1px solid #ccc; padding:8px; background:#111; color:#0f0; font-family:monospace; }
-    #parsed { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin-top:8px; }
-    .featureGrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:center; }
+    .box { border:1px solid #ddd; padding:10px; background:#fafafa; }
+    #recvRaw { height:180px; overflow:auto; border:1px solid #ccc; padding:8px; background:#111; color:#0f0; font-family:monospace; }
+    .featureGrid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:8px; }
     .featureBox { border:1px solid #e5e5e5; padding:8px; background:#fff; }
+    .featureDetails { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:6px; }
+    .smallLabel { font-size:0.85rem; color:#333; }
     button { padding:6px 10px; }
     .status { font-weight:600; margin-left:6px; }
   </style>
 </head>
 <body>
-  <h3>Web BLE LIVE + INIT — scaled units</h3>
+  <h3>Web BLE LIVE + INIT — extended INIT fields</h3>
 
   <div class="row">
     <button id="connectButton">Connect</button>
@@ -51,16 +52,18 @@
       </div>
     </div>
 
-    <div style="width:640px">
+    <div style="width:760px">
       <div class="box">
         <strong>LIVE Data (parsed)</strong>
-        <div id="parsed">
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;">
           <div><label>Battery</label><br><input id="battery_V" class="small" type="text" readonly /></div>
           <div><label>Current (mA)</label><br><input id="current_mA" class="small" type="text" readonly /></div>
           <div><label>Temp (°C)</label><br><input id="tempC" class="small" type="text" readonly /></div>
+
           <div><label>Min Freq (kHz)</label><br><input id="minkHz" class="small" type="text" readonly /></div>
           <div><label>Max Freq (kHz)</label><br><input id="maxkHz" class="small" type="text" readonly /></div>
           <div><label>Wave vel</label><br><input id="waveVel" class="small" type="text" readonly /></div>
+
           <div><label>Pattern</label><br><input id="pattern" class="small" type="text" readonly /></div>
           <div><label>Uptime Days</label><br><input id="days" class="small" type="text" readonly /></div>
           <div><label>HH:MM:SS</label><br><input id="hhmmss" class="small" type="text" readonly /></div>
@@ -71,42 +74,139 @@
       </div>
 
       <div class="box" style="margin-top:12px;">
-        <strong>INIT Data — Feature settings</strong>
-        <div style="margin-top:8px;" class="featureGrid">
+        <strong>INIT Data — Feature settings & ranges</strong>
+
+        <div class="featureGrid">
           <!-- 1: Audible beep -->
           <div class="featureBox">
-            <strong>Audible beep</strong><br>
-            <label>Enabled</label><br><input id="beep_enabled" class="small" type="text" readonly />
-          </div>
-          <div class="featureBox">
-            <label>Set value</label><br><input id="beep_value" class="small" type="text" readonly title="raw value shown in tooltip" />
+            <strong>Audible beep</strong>
+            <div class="featureDetails">
+              <div>
+                <div class="smallLabel">Enabled (current)</div>
+                <input id="beep_enabled" class="small" type="text" readonly />
+              </div>
+              <div>
+                <div class="smallLabel">Enable default (byte 12)</div>
+                <input id="beep_en_default" class="small" type="text" readonly />
+              </div>
+
+              <div>
+                <div class="smallLabel">Set value (byte 13-14)</div>
+                <input id="beep_value" class="small" type="text" readonly title="raw seconds" />
+              </div>
+              <div>
+                <div class="smallLabel">Slider min (bytes 15-16)</div>
+                <input id="beep_min" class="small" type="text" readonly title="raw seconds" />
+              </div>
+
+              <div>
+                <div class="smallLabel">Slider max (bytes 17-18)</div>
+                <input id="beep_max" class="small" type="text" readonly title="raw seconds" />
+              </div>
+              <div>
+                <div class="smallLabel">Default (bytes 19-20)</div>
+                <input id="beep_default" class="small" type="text" readonly title="raw seconds" />
+              </div>
+            </div>
           </div>
 
           <!-- 2: Standby mode -->
           <div class="featureBox">
-            <strong>Standby mode</strong><br>
-            <label>Enabled</label><br><input id="standby_enabled" class="small" type="text" readonly />
-          </div>
-          <div class="featureBox">
-            <label>Set value</label><br><input id="standby_value" class="small" type="text" readonly title="raw mV shown in tooltip" />
+            <strong>Standby mode</strong>
+            <div class="featureDetails">
+              <div>
+                <div class="smallLabel">Enabled (current)</div>
+                <input id="standby_enabled" class="small" type="text" readonly />
+              </div>
+              <div>
+                <div class="smallLabel">Enable default (byte 22)</div>
+                <input id="standby_en_default" class="small" type="text" readonly />
+              </div>
+
+              <div>
+                <div class="smallLabel">Set value (bytes 23-24)</div>
+                <input id="standby_value" class="small" type="text" readonly title="raw mV" />
+              </div>
+              <div>
+                <div class="smallLabel">Slider min (bytes 25-26)</div>
+                <input id="standby_min" class="small" type="text" readonly title="raw mV" />
+              </div>
+
+              <div>
+                <div class="smallLabel">Slider max (bytes 27-28)</div>
+                <input id="standby_max" class="small" type="text" readonly title="raw mV" />
+              </div>
+              <div>
+                <div class="smallLabel">Default (bytes 29-30)</div>
+                <input id="standby_default" class="small" type="text" readonly title="raw mV" />
+              </div>
+            </div>
           </div>
 
           <!-- 3: Shutdown mode -->
           <div class="featureBox">
-            <strong>Shutdown mode</strong><br>
-            <label>Enabled</label><br><input id="shutdown_enabled" class="small" type="text" readonly />
-          </div>
-          <div class="featureBox">
-            <label>Set value</label><br><input id="shutdown_value" class="small" type="text" readonly title="raw mV shown in tooltip" />
+            <strong>Shutdown mode</strong>
+            <div class="featureDetails">
+              <div>
+                <div class="smallLabel">Enabled (current)</div>
+                <input id="shutdown_enabled" class="small" type="text" readonly />
+              </div>
+              <div>
+                <div class="smallLabel">Enable default (byte 32)</div>
+                <input id="shutdown_en_default" class="small" type="text" readonly />
+              </div>
+
+              <div>
+                <div class="smallLabel">Set value (bytes 33-34)</div>
+                <input id="shutdown_value" class="small" type="text" readonly title="raw mV" />
+              </div>
+              <div>
+                <div class="smallLabel">Slider min (bytes 35-36)</div>
+                <input id="shutdown_min" class="small" type="text" readonly title="raw mV" />
+              </div>
+
+              <div>
+                <div class="smallLabel">Slider max (bytes 37-38)</div>
+                <input id="shutdown_max" class="small" type="text" readonly title="raw mV" />
+              </div>
+              <div>
+                <div class="smallLabel">Default (bytes 39-40)</div>
+                <input id="shutdown_default" class="small" type="text" readonly title="raw mV" />
+              </div>
+            </div>
           </div>
 
           <!-- 4: Audible Hiss band -->
           <div class="featureBox">
-            <strong>Audible Hiss band</strong><br>
-            <label>Enabled</label><br><input id="hiss_enabled" class="small" type="text" readonly />
-          </div>
-          <div class="featureBox">
-            <label>Set value</label><br><input id="hiss_value" class="small" type="text" readonly title="raw value shown in tooltip" />
+            <strong>Audible Hiss band</strong>
+            <div class="featureDetails">
+              <div>
+                <div class="smallLabel">Enabled (current)</div>
+                <input id="hiss_enabled" class="small" type="text" readonly />
+              </div>
+              <div>
+                <div class="smallLabel">Enable default (byte 42)</div>
+                <input id="hiss_en_default" class="small" type="text" readonly />
+              </div>
+
+              <div>
+                <div class="smallLabel">Set value (bytes 43-44)</div>
+                <input id="hiss_value" class="small" type="text" readonly title="raw percent" />
+              </div>
+              <div>
+                <div class="smallLabel">Slider min (bytes 45-46)</div>
+                <input id="hiss_min" class="small" type="text" readonly title="raw percent" />
+              </div>
+
+              <div>
+                <div class="smallLabel">Slider max (bytes 47-48)</div>
+                <input id="hiss_max" class="small" type="text" readonly title="raw percent" />
+              </div>
+              <div>
+                <div class="smallLabel">Default (bytes 49-50)</div>
+                <input id="hiss_default" class="small" type="text" readonly title="raw percent" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -118,7 +218,7 @@
   </div>
 
   <script>
-    // --- unchanged UUIDs and commands ---
+    // UUIDs & commands (unchanged)
     const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
     const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
     const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
@@ -126,7 +226,7 @@
     const LIVE_CMD_HEX = "FD FC FB FA 04 00 4C 49 56 45 04 03 02 01";
     const INIT_CMD_HEX = "FD FC FB FA 04 00 49 4E 49 54 04 03 02 01";
 
-    // --- DOM ---
+    // DOM refs
     const connectButton = document.getElementById("connectButton");
     const disconnectButton = document.getElementById("disconnectButton");
 
@@ -142,7 +242,7 @@
     const clearRaw = document.getElementById("clearRaw");
     const forceParse = document.getElementById("forceParse");
 
-    // LIVE parsed fields
+    // LIVE fields
     const battery_V = document.getElementById("battery_V");
     const current_mA = document.getElementById("current_mA");
     const tempC = document.getElementById("tempC");
@@ -154,26 +254,45 @@
     const hhmmss = document.getElementById("hhmmss");
     const copyParsed = document.getElementById("copyParsed");
 
-    // INIT parsed fields (features)
+    // INIT fields
     const beep_enabled = document.getElementById("beep_enabled");
+    const beep_en_default = document.getElementById("beep_en_default");
     const beep_value = document.getElementById("beep_value");
+    const beep_min = document.getElementById("beep_min");
+    const beep_max = document.getElementById("beep_max");
+    const beep_default = document.getElementById("beep_default");
+
     const standby_enabled = document.getElementById("standby_enabled");
+    const standby_en_default = document.getElementById("standby_en_default");
     const standby_value = document.getElementById("standby_value");
+    const standby_min = document.getElementById("standby_min");
+    const standby_max = document.getElementById("standby_max");
+    const standby_default = document.getElementById("standby_default");
+
     const shutdown_enabled = document.getElementById("shutdown_enabled");
+    const shutdown_en_default = document.getElementById("shutdown_en_default");
     const shutdown_value = document.getElementById("shutdown_value");
+    const shutdown_min = document.getElementById("shutdown_min");
+    const shutdown_max = document.getElementById("shutdown_max");
+    const shutdown_default = document.getElementById("shutdown_default");
+
     const hiss_enabled = document.getElementById("hiss_enabled");
+    const hiss_en_default = document.getElementById("hiss_en_default");
     const hiss_value = document.getElementById("hiss_value");
+    const hiss_min = document.getElementById("hiss_min");
+    const hiss_max = document.getElementById("hiss_max");
+    const hiss_default = document.getElementById("hiss_default");
     const copyInit = document.getElementById("copyInit");
 
-    // --- BLE state ---
+    // state
     let device, server, notifyChar, writeChar;
     let lastPacket = null;
 
-    // auto send control
+    // auto send
     let autoIntervalId = null;
     let writeInProgress = false;
 
-    // helper: convert bytes to hex
+    // helpers
     function bytesToHexUpper(bytes) {
       return Array.from(bytes).map(b => b.toString(16).padStart(2,"0").toUpperCase()).join(" ");
     }
@@ -192,7 +311,7 @@
       return (h << 8) | l;
     }
 
-    // LIVE parser (unchanged semantics)
+    // LIVE parser (unchanged)
     function parseLivePacket(bytes) {
       const buf = Uint8Array.from(bytes);
       const ABS_NEEDED = 28;
@@ -214,7 +333,7 @@
         return parsed;
       }
 
-      // fallback: search "LIVE"
+      // fallback: look for "LIVE" tag
       let idx = -1;
       for (let i=0; i <= buf.length - 4; ++i) {
         if (buf[i] === 0x4C && buf[i+1] === 0x49 && buf[i+2] === 0x56 && buf[i+3] === 0x45) { idx = i; break; }
@@ -237,7 +356,6 @@
       return parsed;
     }
 
-    // show LIVE scaled values
     function showLive(obj) {
       if (!obj || obj.error) {
         battery_V.value = ""; current_mA.value = ""; tempC.value = ""; minkHz.value = ""; maxkHz.value = "";
@@ -255,81 +373,147 @@
       hhmmss.value = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "";
     }
 
-    // INIT parser using exact indices you provided:
-    // en bytes: 11,21,31,41
-    // set value LE: (13,14), (23,24), (33,34), (43,44)
+    // INIT parser — reads all set + defaults + slider min/max/defaults (absolute indices)
+    // Required minimum buffer length: 51 (highest index used = 50)
     function parseInitPacket(bytes) {
       const buf = Uint8Array.from(bytes);
-      // we need at least byte index 44 -> length 45
-      if (buf.length < 45) {
+      if (buf.length < 51) {
+        // fallback: try to detect INIT tag but prefer absolute parse
         let idx = -1;
         for (let i=0; i <= buf.length - 4; ++i) {
           if (buf[i] === 0x49 && buf[i+1] === 0x4E && buf[i+2] === 0x49 && buf[i+3] === 0x54) { idx = i; break; }
         }
-        if (idx < 0) return { error: "INIT not found and packet too short for absolute INIT offsets." };
-        return { error: "Packet short for absolute INIT parse; INIT tag found but absolute positions required." };
+        if (idx < 0) return { error: "INIT not found and packet too short for absolute INIT offsets (need 51 bytes)." };
+        return { error: "INIT tag found but packet too short for absolute INIT offsets; provide full frame for absolute parsing." };
       }
 
+      // Read enable bytes & values
       const beep_en = readU8(buf, 11);
+      const beep_en_default = readU8(buf, 12);
       const beep_val = readU16le(buf, 13, 14);
+      const beep_min = readU16le(buf, 15, 16);
+      const beep_max = readU16le(buf, 17, 18);
+      const beep_def = readU16le(buf, 19, 20);
 
       const standby_en = readU8(buf, 21);
+      const standby_en_default = readU8(buf, 22);
       const standby_val = readU16le(buf, 23, 24);
+      const standby_minv = readU16le(buf, 25, 26);
+      const standby_maxv = readU16le(buf, 27, 28);
+      const standby_defv = readU16le(buf, 29, 30);
 
       const shutdown_en = readU8(buf, 31);
+      const shutdown_en_default = readU8(buf, 32);
       const shutdown_val = readU16le(buf, 33, 34);
+      const shutdown_minv = readU16le(buf, 35, 36);
+      const shutdown_maxv = readU16le(buf, 37, 38);
+      const shutdown_defv = readU16le(buf, 39, 40);
 
       const hiss_en = readU8(buf, 41);
+      const hiss_en_default = readU8(buf, 42);
       const hiss_val = readU16le(buf, 43, 44);
+      const hiss_minv = readU16le(buf, 45, 46);
+      const hiss_maxv = readU16le(buf, 47, 48);
+      const hiss_defv = readU16le(buf, 49, 50);
 
       return {
-        beep: { enabled: (beep_en === 1), value: beep_val },
-        standby: { enabled: (standby_en === 1), value: standby_val },
-        shutdown: { enabled: (shutdown_en === 1), value: shutdown_val },
-        hiss: { enabled: (hiss_en === 1), value: hiss_val },
+        beep: {
+          enabled: (beep_en === 1),
+          en_default: beep_en_default === 1,
+          value: beep_val,
+          min: beep_min,
+          max: beep_max,
+          def: beep_def
+        },
+        standby: {
+          enabled: (standby_en === 1),
+          en_default: standby_en_default === 1,
+          value_mV: standby_val,
+          min_mV: standby_minv,
+          max_mV: standby_maxv,
+          def_mV: standby_defv
+        },
+        shutdown: {
+          enabled: (shutdown_en === 1),
+          en_default: shutdown_en_default === 1,
+          value_mV: shutdown_val,
+          min_mV: shutdown_minv,
+          max_mV: shutdown_maxv,
+          def_mV: shutdown_defv
+        },
+        hiss: {
+          enabled: (hiss_en === 1),
+          en_default: hiss_en_default === 1,
+          value_pct: hiss_val,
+          min_pct: hiss_minv,
+          max_pct: hiss_maxv,
+          def_pct: hiss_defv
+        },
         rawHex: bytesToHexUpper(buf)
       };
     }
 
-    // show INIT parsed fields with requested unit conversions:
-    // - beep: seconds (raw ÷ 1000) shown with 3 decimals and tooltip contains raw
-    // - standby/shutdown: V (raw mV ÷ 1000) shown with 3 decimals, tooltip raw mV
-    // - hiss: percent (%) shown as integer + '%' (tooltip raw)
+    // show INIT fields converting units as requested
     function showInit(obj) {
       if (!obj || obj.error) {
-        beep_enabled.value = ""; beep_value.value = "";
-        standby_enabled.value = ""; standby_value.value = "";
-        shutdown_enabled.value = ""; shutdown_value.value = "";
-        hiss_enabled.value = ""; hiss_value.value = "";
+        // clear all INIT UI
+        [beep_enabled, beep_en_default, beep_value, beep_min, beep_max, beep_default,
+         standby_enabled, standby_en_default, standby_value, standby_min, standby_max, standby_default,
+         shutdown_enabled, shutdown_en_default, shutdown_value, shutdown_min, shutdown_max, shutdown_default,
+         hiss_enabled, hiss_en_default, hiss_value, hiss_min, hiss_max, hiss_default].forEach(el => el.value = "");
         return;
       }
 
+      // beep: seconds (raw) — user requested NOT to divide by 1000
       beep_enabled.value = obj.beep.enabled ? "Enabled" : "Disabled";
-      if (obj.beep.value != null) {
-        beep_value.value = (obj.beep.value / 1000).toFixed(3) + " s";
-        beep_value.title = `raw=${obj.beep.value}`;
-      } else { beep_value.value = ""; beep_value.title = ""; }
+      beep_en_default.value = obj.beep.en_default ? "Enabled" : "Disabled";
+      beep_value.value = (obj.beep.value != null) ? `${obj.beep.value} s` : "";
+      beep_value.title = `raw=${obj.beep.value}`;
+      beep_min.value = (obj.beep.min != null) ? `${obj.beep.min} s` : "";
+      beep_min.title = `raw=${obj.beep.min}`;
+      beep_max.value = (obj.beep.max != null) ? `${obj.beep.max} s` : "";
+      beep_max.title = `raw=${obj.beep.max}`;
+      beep_default.value = (obj.beep.def != null) ? `${obj.beep.def} s` : "";
+      beep_default.title = `raw=${obj.beep.def}`;
 
+      // standby: convert mV -> V (3 decimals)
       standby_enabled.value = obj.standby.enabled ? "Enabled" : "Disabled";
-      if (obj.standby.value != null) {
-        standby_value.value = (obj.standby.value / 1000).toFixed(3) + " V";
-        standby_value.title = `raw mV=${obj.standby.value}`;
-      } else { standby_value.value = ""; standby_value.title = ""; }
+      standby_en_default.value = obj.standby.en_default ? "Enabled" : "Disabled";
+      standby_value.value = (obj.standby.value_mV != null) ? `${(obj.standby.value_mV/1000).toFixed(3)} V` : "";
+      standby_value.title = `raw mV=${obj.standby.value_mV}`;
+      standby_min.value = (obj.standby.min_mV != null) ? `${(obj.standby.min_mV/1000).toFixed(3)} V` : "";
+      standby_min.title = `raw mV=${obj.standby.min_mV}`;
+      standby_max.value = (obj.standby.max_mV != null) ? `${(obj.standby.max_mV/1000).toFixed(3)} V` : "";
+      standby_max.title = `raw mV=${obj.standby.max_mV}`;
+      standby_default.value = (obj.standby.def_mV != null) ? `${(obj.standby.def_mV/1000).toFixed(3)} V` : "";
+      standby_default.title = `raw mV=${obj.standby.def_mV}`;
 
+      // shutdown: convert mV -> V
       shutdown_enabled.value = obj.shutdown.enabled ? "Enabled" : "Disabled";
-      if (obj.shutdown.value != null) {
-        shutdown_value.value = (obj.shutdown.value / 1000).toFixed(3) + " V";
-        shutdown_value.title = `raw mV=${obj.shutdown.value}`;
-      } else { shutdown_value.value = ""; shutdown_value.title = ""; }
+      shutdown_en_default.value = obj.shutdown.en_default ? "Enabled" : "Disabled";
+      shutdown_value.value = (obj.shutdown.value_mV != null) ? `${(obj.shutdown.value_mV/1000).toFixed(3)} V` : "";
+      shutdown_value.title = `raw mV=${obj.shutdown.value_mV}`;
+      shutdown_min.value = (obj.shutdown.min_mV != null) ? `${(obj.shutdown.min_mV/1000).toFixed(3)} V` : "";
+      shutdown_min.title = `raw mV=${obj.shutdown.min_mV}`;
+      shutdown_max.value = (obj.shutdown.max_mV != null) ? `${(obj.shutdown.max_mV/1000).toFixed(3)} V` : "";
+      shutdown_max.title = `raw mV=${obj.shutdown.max_mV}`;
+      shutdown_default.value = (obj.shutdown.def_mV != null) ? `${(obj.shutdown.def_mV/1000).toFixed(3)} V` : "";
+      shutdown_default.title = `raw mV=${obj.shutdown.def_mV}`;
 
+      // hiss: percent (%) integers
       hiss_enabled.value = obj.hiss.enabled ? "Enabled" : "Disabled";
-      if (obj.hiss.value != null) {
-        hiss_value.value = `${obj.hiss.value} %`;
-        hiss_value.title = `raw=${obj.hiss.value}`;
-      } else { hiss_value.value = ""; hiss_value.title = ""; }
+      hiss_en_default.value = obj.hiss.en_default ? "Enabled" : "Disabled";
+      hiss_value.value = (obj.hiss.value_pct != null) ? `${obj.hiss.value_pct} %` : "";
+      hiss_value.title = `raw=${obj.hiss.value_pct}`;
+      hiss_min.value = (obj.hiss.min_pct != null) ? `${obj.hiss.min_pct} %` : "";
+      hiss_min.title = `raw=${obj.hiss.min_pct}`;
+      hiss_max.value = (obj.hiss.max_pct != null) ? `${obj.hiss.max_pct} %` : "";
+      hiss_max.title = `raw=${obj.hiss.max_pct}`;
+      hiss_default.value = (obj.hiss.def_pct != null) ? `${obj.hiss.def_pct} %` : "";
+      hiss_default.title = `raw=${obj.hiss.def_pct}`;
     }
 
-    // --- BLE connect / notify handling ---
+    // BLE connect & handler (preserves previous behavior)
     async function connect() {
       try {
         device = await navigator.bluetooth.requestDevice({
@@ -372,7 +556,7 @@
       const arr = new Uint8Array(ev.target.value.buffer);
       appendRaw(arr);
 
-      // Try parsing LIVE (if present)
+      // Try parse LIVE
       try {
         const liveParsed = parseLivePacket(arr);
         if (!liveParsed.error) showLive(liveParsed);
@@ -380,10 +564,10 @@
         console.warn("LIVE parse error:", e);
       }
 
-      // Try parsing INIT (if present)
+      // Try parse INIT if present (we require full length for absolute parsing)
       try {
         let initDetected = false;
-        if (arr.length >= 45) initDetected = true;
+        if (arr.length >= 51) initDetected = true;
         else {
           for (let i=0;i<=arr.length-4;i++) {
             if (arr[i] === 0x49 && arr[i+1] === 0x4E && arr[i+2] === 0x49 && arr[i+3] === 0x54) { initDetected = true; break; }
@@ -392,13 +576,14 @@
         if (initDetected) {
           const initParsed = parseInitPacket(arr);
           if (!initParsed.error) showInit(initParsed);
+          else console.warn("INIT parse skipped:", initParsed.error);
         }
       } catch (e) {
         console.warn("INIT parse error:", e);
       }
     }
 
-    // write helper
+    // helpers: hex -> bytes
     function hexToBytes(hexStr) {
       const cleaned = hexStr.replace(/0x/g, "").replace(/[^A-Fa-f0-9]/g,"");
       const out = new Uint8Array(cleaned.length / 2);
@@ -428,7 +613,7 @@
       finally { writeInProgress = false; }
     }
 
-    // Auto start/stop for LIVE (unchanged)
+    // auto LIVE controls
     function startAuto() {
       if (autoIntervalId !== null) return;
       if (!writeChar) { alert("Not connected"); return; }
@@ -489,10 +674,10 @@
 
     copyInit.addEventListener("click", async () => {
       const lines = [
-        `Audible beep: ${beep_enabled.value} , set=${beep_value.value} (raw:${beep_value.title.replace("raw=","")||""})`,
-        `Standby mode: ${standby_enabled.value} , set=${standby_value.value} (raw:${standby_value.title.replace("raw mV=","")||""})`,
-        `Shutdown mode: ${shutdown_enabled.value} , set=${shutdown_value.value} (raw:${shutdown_value.title.replace("raw mV=","")||""})`,
-        `Audible Hiss band: ${hiss_enabled.value} , set=${hiss_value.value} (raw:${hiss_value.title.replace("raw=","")||""})`
+        `Audible beep: ${beep_enabled.value} (default: ${beep_en_default.value}), set=${beep_value.value}, min=${beep_min.value}, max=${beep_max.value}, default=${beep_default.value}`,
+        `Standby mode: ${standby_enabled.value} (default: ${standby_en_default.value}), set=${standby_value.value}, min=${standby_min.value}, max=${standby_max.value}, default=${standby_default.value}`,
+        `Shutdown mode: ${shutdown_enabled.value} (default: ${shutdown_en_default.value}), set=${shutdown_value.value}, min=${shutdown_min.value}, max=${shutdown_max.value}, default=${shutdown_default.value}`,
+        `Audible Hiss band: ${hiss_enabled.value} (default: ${hiss_en_default.value}), set=${hiss_value.value}, min=${hiss_min.value}, max=${hiss_max.value}, default=${hiss_default.value}`
       ].join("\n");
       await navigator.clipboard.writeText(lines);
       alert("INIT parsed copied to clipboard");

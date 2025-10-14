@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web BLE LIVE + INIT parser</title>
+  <title>Web BLE LIVE + INIT — scaled units</title>
   <style>
     body { font-family: Arial, sans-serif; margin:16px; }
     .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <h3>Web BLE LIVE + INIT — scaled units + auto LIVE + INIT parsing</h3>
+  <h3>Web BLE LIVE + INIT — scaled units</h3>
 
   <div class="row">
     <button id="connectButton">Connect</button>
@@ -72,14 +72,14 @@
 
       <div class="box" style="margin-top:12px;">
         <strong>INIT Data — Feature settings</strong>
-        <div class="featureGrid" style="margin-top:8px;">
+        <div style="margin-top:8px;" class="featureGrid">
           <!-- 1: Audible beep -->
           <div class="featureBox">
             <strong>Audible beep</strong><br>
             <label>Enabled</label><br><input id="beep_enabled" class="small" type="text" readonly />
           </div>
           <div class="featureBox">
-            <label>Set value</label><br><input id="beep_value" class="small" type="text" readonly />
+            <label>Set value</label><br><input id="beep_value" class="small" type="text" readonly title="raw value shown in tooltip" />
           </div>
 
           <!-- 2: Standby mode -->
@@ -88,7 +88,7 @@
             <label>Enabled</label><br><input id="standby_enabled" class="small" type="text" readonly />
           </div>
           <div class="featureBox">
-            <label>Set value</label><br><input id="standby_value" class="small" type="text" readonly />
+            <label>Set value</label><br><input id="standby_value" class="small" type="text" readonly title="raw mV shown in tooltip" />
           </div>
 
           <!-- 3: Shutdown mode -->
@@ -97,7 +97,7 @@
             <label>Enabled</label><br><input id="shutdown_enabled" class="small" type="text" readonly />
           </div>
           <div class="featureBox">
-            <label>Set value</label><br><input id="shutdown_value" class="small" type="text" readonly />
+            <label>Set value</label><br><input id="shutdown_value" class="small" type="text" readonly title="raw mV shown in tooltip" />
           </div>
 
           <!-- 4: Audible Hiss band -->
@@ -106,7 +106,7 @@
             <label>Enabled</label><br><input id="hiss_enabled" class="small" type="text" readonly />
           </div>
           <div class="featureBox">
-            <label>Set value</label><br><input id="hiss_value" class="small" type="text" readonly />
+            <label>Set value</label><br><input id="hiss_value" class="small" type="text" readonly title="raw value shown in tooltip" />
           </div>
         </div>
 
@@ -262,13 +262,11 @@
       const buf = Uint8Array.from(bytes);
       // we need at least byte index 44 -> length 45
       if (buf.length < 45) {
-        // try to find "INIT" tag and if found attempt offsets relative to it (but user prefers absolute indices)
         let idx = -1;
         for (let i=0; i <= buf.length - 4; ++i) {
           if (buf[i] === 0x49 && buf[i+1] === 0x4E && buf[i+2] === 0x49 && buf[i+3] === 0x54) { idx = i; break; }
         }
         if (idx < 0) return { error: "INIT not found and packet too short for absolute INIT offsets." };
-        // if found do a best-effort using relative positions (assuming positions shift) - but prefer absolute.
         return { error: "Packet short for absolute INIT parse; INIT tag found but absolute positions required." };
       }
 
@@ -293,7 +291,10 @@
       };
     }
 
-    // show INIT parsed fields
+    // show INIT parsed fields with requested unit conversions:
+    // - beep: seconds (raw ÷ 1000) shown with 3 decimals and tooltip contains raw
+    // - standby/shutdown: V (raw mV ÷ 1000) shown with 3 decimals, tooltip raw mV
+    // - hiss: percent (%) shown as integer + '%' (tooltip raw)
     function showInit(obj) {
       if (!obj || obj.error) {
         beep_enabled.value = ""; beep_value.value = "";
@@ -302,17 +303,30 @@
         hiss_enabled.value = ""; hiss_value.value = "";
         return;
       }
+
       beep_enabled.value = obj.beep.enabled ? "Enabled" : "Disabled";
-      beep_value.value = (obj.beep.value != null) ? obj.beep.value.toString() : "";
+      if (obj.beep.value != null) {
+        beep_value.value = (obj.beep.value / 1000).toFixed(3) + " s";
+        beep_value.title = `raw=${obj.beep.value}`;
+      } else { beep_value.value = ""; beep_value.title = ""; }
 
       standby_enabled.value = obj.standby.enabled ? "Enabled" : "Disabled";
-      standby_value.value = (obj.standby.value != null) ? obj.standby.value.toString() : "";
+      if (obj.standby.value != null) {
+        standby_value.value = (obj.standby.value / 1000).toFixed(3) + " V";
+        standby_value.title = `raw mV=${obj.standby.value}`;
+      } else { standby_value.value = ""; standby_value.title = ""; }
 
       shutdown_enabled.value = obj.shutdown.enabled ? "Enabled" : "Disabled";
-      shutdown_value.value = (obj.shutdown.value != null) ? obj.shutdown.value.toString() : "";
+      if (obj.shutdown.value != null) {
+        shutdown_value.value = (obj.shutdown.value / 1000).toFixed(3) + " V";
+        shutdown_value.title = `raw mV=${obj.shutdown.value}`;
+      } else { shutdown_value.value = ""; shutdown_value.title = ""; }
 
       hiss_enabled.value = obj.hiss.enabled ? "Enabled" : "Disabled";
-      hiss_value.value = (obj.hiss.value != null) ? obj.hiss.value.toString() : "";
+      if (obj.hiss.value != null) {
+        hiss_value.value = `${obj.hiss.value} %`;
+        hiss_value.title = `raw=${obj.hiss.value}`;
+      } else { hiss_value.value = ""; hiss_value.title = ""; }
     }
 
     // --- BLE connect / notify handling ---
@@ -368,11 +382,9 @@
 
       // Try parsing INIT (if present)
       try {
-        // detect by "INIT" tag or buffer length
         let initDetected = false;
         if (arr.length >= 45) initDetected = true;
         else {
-          // look for ASCII "INIT"
           for (let i=0;i<=arr.length-4;i++) {
             if (arr[i] === 0x49 && arr[i+1] === 0x4E && arr[i+2] === 0x49 && arr[i+3] === 0x54) { initDetected = true; break; }
           }
@@ -477,10 +489,10 @@
 
     copyInit.addEventListener("click", async () => {
       const lines = [
-        `Audible beep: ${beep_enabled.value} , set=${beep_value.value}`,
-        `Standby mode: ${standby_enabled.value} , set=${standby_value.value}`,
-        `Shutdown mode: ${shutdown_enabled.value} , set=${shutdown_value.value}`,
-        `Audible Hiss band: ${hiss_enabled.value} , set=${hiss_value.value}`
+        `Audible beep: ${beep_enabled.value} , set=${beep_value.value} (raw:${beep_value.title.replace("raw=","")||""})`,
+        `Standby mode: ${standby_enabled.value} , set=${standby_value.value} (raw:${standby_value.title.replace("raw mV=","")||""})`,
+        `Shutdown mode: ${shutdown_enabled.value} , set=${shutdown_value.value} (raw:${shutdown_value.title.replace("raw mV=","")||""})`,
+        `Audible Hiss band: ${hiss_enabled.value} , set=${hiss_value.value} (raw:${hiss_value.title.replace("raw=","")||""})`
       ].join("\n");
       await navigator.clipboard.writeText(lines);
       alert("INIT parsed copied to clipboard");

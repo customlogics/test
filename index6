@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Web BLE LIVE + INIT — Save waits for INIT ack</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin:16px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    label { font-size:0.9rem; }
+    input[type="text"], input[type="number"] { padding:6px; font-family:monospace; }
+    input.small { width:120px; }
+    .box { border:1px solid #ddd; padding:10px; background:#fafafa; }
+    #recvRaw { height:180px; overflow:auto; border:1px solid #ccc; padding:8px; background:#111; color:#0f0; font-family:monospace; }
+    .featureGrid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:8px; }
+    .featureBox { border:1px solid #e5e5e5; padding:8px; background:#fff; position:relative; }
+    .featureDetails { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:6px; }
+    .smallLabel { font-size:0.85rem; color:#333; }
+    button { padding:6px 10px; cursor:pointer; }
+    .status { font-weight:600; margin-left:6px; }
+    .editBtn { position:absolute; right:8px; top:8px; font-size:0.9rem; padding:4px 8px; }
+    .modal-backdrop { position:fixed; inset:0; background: rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; z-index:2000; }
+    .modal { width:420px; background:#f2f8ff; border-radius:12px; padding:18px; box-shadow:0 6px 30px rgba(0,0,0,0.25); position:relative; }
+    .modal h2 { margin:0 0 8px 0; text-align:center; font-size:1.4rem; }
+    .modal .toggle { display:flex; justify-content:center; align-items:center; gap:12px; margin:8px 0 14px 0; }
+    .toggle .switch { width:54px; height:30px; background:#ddd; border-radius:18px; position:relative; }
+    .toggle .switch.on { background:#111; }
+    .toggle .knob { width:24px; height:24px; background:#fff; border-radius:50%; position:absolute; top:3px; left:3px; transition:left .12s; box-shadow:0 2px 4px rgba(0,0,0,0.2); }
+    .toggle .switch.on .knob { left:27px; }
+    .modal .divider { height:1px; background:#cfcfcf; margin:12px 0; }
+    .modal .sliderContainer { text-align:center; }
+    .modal input[type="range"] { width:100%; margin-top:10px; }
+    .modal .valueDisplay { font-size:1.6rem; font-weight:700; margin-top:8px; text-align:center; }
+    .modal .modalActions { display:flex; gap:12px; justify-content:space-between; margin-top:14px; }
+    .modal .btnReset { background:#fff; border:1px solid #d0d7e8; padding:10px 16px; border-radius:10px; }
+    .modal .btnSave { background:#5b4bff; color:#fff; border:none; padding:10px 18px; border-radius:12px; }
+    .modal .closeX { position:absolute; right:12px; top:8px; font-weight:700; cursor:pointer; }
+    .unitSmall { font-size:0.9rem; color:#333; }
+  </style>
+</head>
+<body>
+  <h3>Web BLE LIVE + INIT — Save waits for INIT ack</h3>
+
+  <div class="row">
+    <button id="connectButton">Connect</button>
+    <button id="disconnectButton" disabled>Disconnect</button>
+
+    <button id="sendLiveBtn" disabled>SEND LIVE</button>
+    <button id="startAutoBtn" disabled>AUTO LIVE (500ms)</button>
+    <button id="stopAutoBtn" disabled>STOP AUTO</button>
+    <span id="autoStatus" class="status">Idle</span>
+
+    <button id="sendInitBtn" disabled>SEND INIT</button>
+    <button id="forceParseInit" disabled>Parse last as INIT</button>
+  </div>
+
+  <hr />
+
+  <div style="display:flex;gap:12px;align-items:flex-start;">
+    <div style="flex:1">
+      <div class="box">
+        <strong>Raw Receive (Docklight hex)</strong>
+        <div id="recvRaw"></div>
+        <div style="margin-top:8px;">
+          <button id="clearRaw">Clear Raw</button>
+          <button id="forceParse" title="Force parse as LIVE">Parse latest (force LIVE)</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:760px">
+      <div class="box">
+        <strong>LIVE Data (parsed)</strong>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;">
+          <div><label>Battery</label><br><input id="battery_V" class="small" type="text" readonly /></div>
+          <div><label>Current (mA)</label><br><input id="current_mA" class="small" type="text" readonly /></div>
+          <div><label>Temp (°C)</label><br><input id="tempC" class="small" type="text" readonly /></div>
+
+          <div><label>Min Freq (kHz)</label><br><input id="minkHz" class="small" type="text" readonly /></div>
+          <div><label>Max Freq (kHz)</label><br><input id="maxkHz" class="small" type="text" readonly /></div>
+          <div><label>Wave vel</label><br><input id="waveVel" class="small" type="text" readonly /></div>
+
+          <div><label>Pattern</label><br><input id="pattern" class="small" type="text" readonly /></div>
+          <div><label>Uptime Days</label><br><input id="days" class="small" type="text" readonly /></div>
+          <div><label>HH:MM:SS</label><br><input id="hhmmss" class="small" type="text" readonly /></div>
+        </div>
+        <div style="margin-top:8px;">
+          <button id="copyParsed">Copy parsed (LIVE)</button>
+        </div>
+      </div>
+
+      <div class="box" style="margin-top:12px;">
+        <strong>INIT Data — Feature settings & ranges</strong>
+
+        <div class="featureGrid">
+          <div class="featureBox" id="feat_beep">
+            <button class="editBtn" data-feature="beep">Edit</button>
+            <strong>Audible beep</strong>
+            <div class="featureDetails">
+              <div><div class="smallLabel">Enabled (current)</div><input id="beep_enabled" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Enable default (byte 12)</div><input id="beep_en_default" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Set value (byte 13-14)</div><input id="beep_value" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Slider min (bytes 15-16)</div><input id="beep_min" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Slider max (bytes 17-18)</div><input id="beep_max" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Default (bytes 19-20)</div><input id="beep_default" class="small" type="text" readonly /></div>
+            </div>
+          </div>
+
+          <div class="featureBox" id="feat_standby">
+            <button class="editBtn" data-feature="standby">Edit</button>
+            <strong>Standby mode</strong>
+            <div class="featureDetails">
+              <div><div class="smallLabel">Enabled (current)</div><input id="standby_enabled" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Enable default (byte 22)</div><input id="standby_en_default" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Set value (bytes 23-24)</div><input id="standby_value" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Slider min (bytes 25-26)</div><input id="standby_min" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Slider max (bytes 27-28)</div><input id="standby_max" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Default (bytes 29-30)</div><input id="standby_default" class="small" type="text" readonly /></div>
+            </div>
+          </div>
+
+          <div class="featureBox" id="feat_shutdown">
+            <button class="editBtn" data-feature="shutdown">Edit</button>
+            <strong>Shutdown mode</strong>
+            <div class="featureDetails">
+              <div><div class="smallLabel">Enabled (current)</div><input id="shutdown_enabled" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Enable default (byte 32)</div><input id="shutdown_en_default" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Set value (bytes 33-34)</div><input id="shutdown_value" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Slider min (bytes 35-36)</div><input id="shutdown_min" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Slider max (bytes 37-38)</div><input id="shutdown_max" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Default (bytes 39-40)</div><input id="shutdown_default" class="small" type="text" readonly /></div>
+            </div>
+          </div>
+
+          <div class="featureBox" id="feat_hiss">
+            <button class="editBtn" data-feature="hiss">Edit</button>
+            <strong>Audible Hiss band</strong>
+            <div class="featureDetails">
+              <div><div class="smallLabel">Enabled (current)</div><input id="hiss_enabled" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Enable default (byte 42)</div><input id="hiss_en_default" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Set value (bytes 43-44)</div><input id="hiss_value" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Slider min (bytes 45-46)</div><input id="hiss_min" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Slider max (bytes 47-48)</div><input id="hiss_max" class="small" type="text" readonly /></div>
+              <div><div class="smallLabel">Default (bytes 49-50)</div><input id="hiss_default" class="small" type="text" readonly /></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;">
+          <button id="copyInit">Copy parsed (INIT)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true" id="featureModal">
+      <span class="closeX" id="modalClose">✕</span>
+      <h2 id="modalTitle">Feature</h2>
+      <div class="toggle">
+        <div class="unitSmall">Disabled</div>
+        <div class="switch" id="modalToggle"><div class="knob"></div></div>
+        <div class="unitSmall">Enabled</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="sliderContainer">
+        <div class="smallLabel" id="sliderLabel">Duration - (after every)</div>
+        <input type="range" id="modalSlider" min="0" max="100" step="1" />
+        <div class="valueDisplay" id="modalSliderValue">0 s</div>
+        <div style="display:flex; justify-content:space-between; margin-top:8px;">
+          <div class="unitSmall" id="sliderMinLabel">min</div>
+          <div class="unitSmall" id="sliderMaxLabel">max</div>
+        </div>
+      </div>
+
+      <div class="modalActions">
+        <button class="btnReset" id="modalReset">Reset</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btnSave" id="modalSave">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // UUIDs & commands
+    const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
+    const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
+    const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
+
+    const LIVE_CMD_HEX = "FD FC FB FA 04 00 4C 49 56 45 04 03 02 01";
+    const INIT_CMD_HEX = "FD FC FB FA 04 00 49 4E 49 54 04 03 02 01";
+
+    // CMD bytes for SAVE
+    const CMD_BYTES = {
+      beep: [0x42, 0x45, 0x46, 0x50],     // "BEFP" per your pdf example
+      standby: [0x53, 0x54, 0x41, 0x4E],  // "STAN"
+      shutdown: [0x53, 0x48, 0x55, 0x54], // "SHUT"
+      hiss: [0x48, 0x49, 0x53, 0x53]      // "HISS"
+    };
+
+    // DOM refs
+    const connectButton = document.getElementById("connectButton");
+    const disconnectButton = document.getElementById("disconnectButton");
+    const sendLiveBtn = document.getElementById("sendLiveBtn");
+    const startAutoBtn = document.getElementById("startAutoBtn");
+    const stopAutoBtn = document.getElementById("stopAutoBtn");
+    const autoStatus = document.getElementById("autoStatus");
+    const sendInitBtn = document.getElementById("sendInitBtn");
+    const forceParseInit = document.getElementById("forceParseInit");
+    const recvRaw = document.getElementById("recvRaw");
+    const clearRaw = document.getElementById("clearRaw");
+    const forceParse = document.getElementById("forceParse");
+
+    // LIVE fields
+    const battery_V = document.getElementById("battery_V");
+    const current_mA = document.getElementById("current_mA");
+    const tempC = document.getElementById("tempC");
+    const minkHz = document.getElementById("minkHz");
+    const maxkHz = document.getElementById("maxkHz");
+    const waveVel = document.getElementById("waveVel");
+    const pattern = document.getElementById("pattern");
+    const days = document.getElementById("days");
+    const hhmmss = document.getElementById("hhmmss");
+    const copyParsed = document.getElementById("copyParsed");
+
+    // INIT fields
+    const beep_enabled = document.getElementById("beep_enabled");
+    const beep_en_default = document.getElementById("beep_en_default");
+    const beep_value = document.getElementById("beep_value");
+    const beep_min = document.getElementById("beep_min");
+    const beep_max = document.getElementById("beep_max");
+    const beep_default = document.getElementById("beep_default");
+
+    const standby_enabled = document.getElementById("standby_enabled");
+    const standby_en_default = document.getElementById("standby_en_default");
+    const standby_value = document.getElementById("standby_value");
+    const standby_min = document.getElementById("standby_min");
+    const standby_max = document.getElementById("standby_max");
+    const standby_default = document.getElementById("standby_default");
+
+    const shutdown_enabled = document.getElementById("shutdown_enabled");
+    const shutdown_en_default = document.getElementById("shutdown_en_default");
+    const shutdown_value = document.getElementById("shutdown_value");
+    const shutdown_min = document.getElementById("shutdown_min");
+    const shutdown_max = document.getElementById("shutdown_max");
+    const shutdown_default = document.getElementById("shutdown_default");
+
+    const hiss_enabled = document.getElementById("hiss_enabled");
+    const hiss_en_default = document.getElementById("hiss_en_default");
+    const hiss_value = document.getElementById("hiss_value");
+    const hiss_min = document.getElementById("hiss_min");
+    const hiss_max = document.getElementById("hiss_max");
+    const hiss_default = document.getElementById("hiss_default");
+    const copyInit = document.getElementById("copyInit");
+
+    // modal refs
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalToggle = document.getElementById('modalToggle');
+    const modalSlider = document.getElementById('modalSlider');
+    const modalSliderValue = document.getElementById('modalSliderValue');
+    const sliderLabel = document.getElementById('sliderLabel');
+    const sliderMinLabel = document.getElementById('sliderMinLabel');
+    const sliderMaxLabel = document.getElementById('sliderMaxLabel');
+    const modalReset = document.getElementById('modalReset');
+    const modalSave = document.getElementById('modalSave');
+    const modalClose = document.getElementById('modalClose');
+    const modalTitle = document.getElementById('modalTitle');
+
+    // state
+    let device, server, notifyChar, writeChar;
+    let lastPacket = null;
+    let currentInitData = null; // parsed INIT data stored for editing
+    let autoIntervalId = null;
+    let writeInProgress = false;
+    let editingFeature = null;
+    let pendingSave = null; // {resolve,reject,timer,feature,value}
+
+    // helpers
+    function bytesToHexUpper(bytes) {
+      return Array.from(bytes).map(b => b.toString(16).padStart(2,"0").toUpperCase()).join(" ");
+    }
+    function appendRaw(bytes, label='') {
+      const t = new Date().toLocaleTimeString();
+      lastPacket = bytes;
+      const tag = label ? ` [${label}]` : '';
+      recvRaw.innerHTML += `[${t}]${tag} ${bytesToHexUpper(bytes)}<br>`;
+      recvRaw.scrollTop = recvRaw.scrollHeight;
+    }
+    function readU8(buf, idx) { return (idx < buf.length) ? buf[idx] : null; }
+    function readU16le(buf, lowIdx, highIdx) {
+      const l = readU8(buf, lowIdx), h = readU8(buf, highIdx);
+      if (l === null || h === null) return null;
+      return (h << 8) | l;
+    }
+    function isTagAt(buf, offset, tagStr) {
+      if (!buf || buf.length < offset + tagStr.length) return false;
+      for (let i = 0; i < tagStr.length; ++i) {
+        if (buf[offset + i] !== tagStr.charCodeAt(i)) return false;
+      }
+      return true;
+    }
+
+    // LIVE parsing
+    function parseLivePacket(bytes) {
+      const buf = Uint8Array.from(bytes);
+      const ABS_NEEDED = 28;
+      if (buf.length < ABS_NEEDED) return { error: "LIVE packet too short" };
+      return {
+        battery_mV: readU16le(buf, 10, 11),
+        current_mA_raw: readU16le(buf, 12, 13),
+        temp_raw: readU16le(buf, 14, 15),
+        min_Hz: readU16le(buf, 16, 17),
+        max_Hz: readU16le(buf, 18, 19),
+        waveVal: readU16le(buf, 20, 21),
+        pattern: readU8(buf, 22),
+        days: readU16le(buf, 23, 24),
+        hh: readU8(buf, 25),
+        mm: readU8(buf, 26),
+        ss: readU8(buf, 27),
+        rawHex: bytesToHexUpper(buf)
+      };
+    }
+    function showLive(obj) {
+      if (!obj || obj.error) {
+        battery_V.value = ""; current_mA.value = ""; tempC.value = ""; minkHz.value = ""; maxkHz.value = "";
+        waveVel.value = ""; pattern.value = ""; days.value = ""; hhmmss.value = "";
+        return;
+      }
+      battery_V.value = (obj.battery_mV != null) ? (obj.battery_mV / 1000).toFixed(3) + " V" : "";
+      current_mA.value = (obj.current_mA_raw != null) ? (obj.current_mA_raw).toString() + " mA" : "";
+      tempC.value = (obj.temp_raw != null) ? (obj.temp_raw / 100).toFixed(2) + " °C" : "";
+      minkHz.value = (obj.min_Hz != null) ? (obj.min_Hz / 1000).toFixed(3) + " kHz" : "";
+      maxkHz.value = (obj.max_Hz != null) ? (obj.max_Hz / 1000).toFixed(3) + " kHz" : "";
+      waveVel.value = (obj.waveVal != null) ? obj.waveVal.toString() : "";
+      pattern.value = (obj.pattern != null) ? obj.pattern.toString() : "";
+      days.value = (obj.days != null) ? obj.days.toString() : "";
+      hhmmss.value = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "";
+    }
+
+    // INIT parsing
+    function parseInitPacket(bytes) {
+      const buf = Uint8Array.from(bytes);
+      if (buf.length < 51) return { error: "INIT packet too short (need ≥51 bytes)" };
+
+      const beep_en = readU8(buf, 11);
+      const beep_en_default = readU8(buf, 12);
+      const beep_val = readU16le(buf, 13, 14);
+      const beep_min = readU16le(buf, 15, 16);
+      const beep_max = readU16le(buf, 17, 18);
+      const beep_def = readU16le(buf, 19, 20);
+
+      const standby_en = readU8(buf, 21);
+      const standby_en_default = readU8(buf, 22);
+      const standby_val = readU16le(buf, 23, 24);
+      const standby_minv = readU16le(buf, 25, 26);
+      const standby_maxv = readU16le(buf, 27, 28);
+      const standby_defv = readU16le(buf, 29, 30);
+
+      const shutdown_en = readU8(buf, 31);
+      const shutdown_en_default = readU8(buf, 32);
+      const shutdown_val = readU16le(buf, 33, 34);
+      const shutdown_minv = readU16le(buf, 35, 36);
+      const shutdown_maxv = readU16le(buf, 37, 38);
+      const shutdown_defv = readU16le(buf, 39, 40);
+
+      const hiss_en = readU8(buf, 41);
+      const hiss_en_default = readU8(buf, 42);
+      const hiss_val = readU16le(buf, 43, 44);
+      const hiss_minv = readU16le(buf, 45, 46);
+      const hiss_maxv = readU16le(buf, 47, 48);
+      const hiss_defv = readU16le(buf, 49, 50);
+
+      return {
+        beep: {
+          enabled: (beep_en === 1),
+          en_default: (beep_en_default === 1),
+          value: beep_val,
+          min: beep_min,
+          max: beep_max,
+          def: beep_def
+        },
+        standby: {
+          enabled: (standby_en === 1),
+          en_default: (standby_en_default === 1),
+          value_mV: standby_val,
+          min_mV: standby_minv,
+          max_mV: standby_maxv,
+          def_mV: standby_defv
+        },
+        shutdown: {
+          enabled: (shutdown_en === 1),
+          en_default: (shutdown_en_default === 1),
+          value_mV: shutdown_val,
+          min_mV: shutdown_minv,
+          max_mV: shutdown_maxv,
+          def_mV: shutdown_defv
+        },
+        hiss: {
+          enabled: (hiss_en === 1),
+          en_default: (hiss_en_default === 1),
+          value_pct: hiss_val,
+          min_pct: hiss_minv,
+          max_pct: hiss_maxv,
+          def_pct: hiss_defv
+        },
+        rawHex: bytesToHexUpper(buf),
+        _rawBuf: buf
+      };
+    }
+
+    // showInit (converts units)
+    function showInit(obj) {
+      if (!obj || obj.error) {
+        [beep_enabled, beep_en_default, beep_value, beep_min, beep_max, beep_default,
+         standby_enabled, standby_en_default, standby_value, standby_min, standby_max, standby_default,
+         shutdown_enabled, shutdown_en_default, shutdown_value, shutdown_min, shutdown_max, shutdown_default,
+         hiss_enabled, hiss_en_default, hiss_value, hiss_min, hiss_max, hiss_default].forEach(el => el.value = "");
+        currentInitData = null;
+        return;
+      }
+
+      currentInitData = obj;
+
+      beep_enabled.value = obj.beep.enabled ? "Enabled" : "Disabled";
+      beep_en_default.value = obj.beep.en_default ? "Enabled" : "Disabled";
+      beep_value.value = (obj.beep.value != null) ? `${obj.beep.value} s` : "";
+      beep_value.title = `raw=${obj.beep.value}`;
+      beep_min.value = (obj.beep.min != null) ? `${obj.beep.min} s` : "";
+      beep_min.title = `raw=${obj.beep.min}`;
+      beep_max.value = (obj.beep.max != null) ? `${obj.beep.max} s` : "";
+      beep_max.title = `raw=${obj.beep.max}`;
+      beep_default.value = (obj.beep.def != null) ? `${obj.beep.def} s` : "";
+      beep_default.title = `raw=${obj.beep.def}`;
+
+      standby_enabled.value = obj.standby.enabled ? "Enabled" : "Disabled";
+      standby_en_default.value = obj.standby.en_default ? "Enabled" : "Disabled";
+      standby_value.value = (obj.standby.value_mV != null) ? `${(obj.standby.value_mV/1000).toFixed(3)} V` : "";
+      standby_value.title = `raw mV=${obj.standby.value_mV}`;
+      standby_min.value = (obj.standby.min_mV != null) ? `${(obj.standby.min_mV/1000).toFixed(3)} V` : "";
+      standby_min.title = `raw mV=${obj.standby.min_mV}`;
+      standby_max.value = (obj.standby.max_mV != null) ? `${(obj.standby.max_mV/1000).toFixed(3)} V` : "";
+      standby_max.title = `raw mV=${obj.standby.max_mV}`;
+      standby_default.value = (obj.standby.def_mV != null) ? `${(obj.standby.def_mV/1000).toFixed(3)} V` : "";
+      standby_default.title = `raw mV=${obj.standby.def_mV}`;
+
+      shutdown_enabled.value = obj.shutdown.enabled ? "Enabled" : "Disabled";
+      shutdown_en_default.value = obj.shutdown.en_default ? "Enabled" : "Disabled";
+      shutdown_value.value = (obj.shutdown.value_mV != null) ? `${(obj.shutdown.value_mV/1000).toFixed(3)} V` : "";
+      shutdown_value.title = `raw mV=${obj.shutdown.value_mV}`;
+      shutdown_min.value = (obj.shutdown.min_mV != null) ? `${(obj.shutdown.min_mV/1000).toFixed(3)} V` : "";
+      shutdown_min.title = `raw mV=${obj.shutdown.min_mV}`;
+      shutdown_max.value = (obj.shutdown.max_mV != null) ? `${(obj.shutdown.max_mV/1000).toFixed(3)} V` : "";
+      shutdown_max.title = `raw mV=${obj.shutdown.max_mV}`;
+      shutdown_default.value = (obj.shutdown.def_mV != null) ? `${(obj.shutdown.def_mV/1000).toFixed(3)} V` : "";
+      shutdown_default.title = `raw mV=${obj.shutdown.def_mV}`;
+
+      hiss_enabled.value = obj.hiss.enabled ? "Enabled" : "Disabled";
+      hiss_en_default.value = obj.hiss.en_default ? "Enabled" : "Disabled";
+      hiss_value.value = (obj.hiss.value_pct != null) ? `${obj.hiss.value_pct} %` : "";
+      hiss_value.title = `raw=${obj.hiss.value_pct}`;
+      hiss_min.value = (obj.hiss.min_pct != null) ? `${obj.hiss.min_pct} %` : "";
+      hiss_min.title = `raw=${obj.hiss.min_pct}`;
+      hiss_max.value = (obj.hiss.max_pct != null) ? `${obj.hiss.max_pct} %` : "";
+      hiss_max.title = `raw=${obj.hiss.max_pct}`;
+      hiss_default.value = (obj.hiss.def_pct != null) ? `${obj.hiss.def_pct} %` : "";
+      hiss_default.title = `raw=${obj.hiss.def_pct}`;
+    }
+
+    // hex->bytes helper
+    function hexToBytes(hexStr) {
+      const cleaned = hexStr.replace(/0x/g, "").replace(/[^A-Fa-f0-9]/g,"");
+      const out = new Uint8Array(cleaned.length / 2);
+      for (let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
+      return out;
+    }
+
+    // send commands
+    async function sendLiveCmd() {
+      if (!writeChar) return console.warn("Not connected");
+      if (writeInProgress) return console.warn("Write in progress");
+      try { writeInProgress = true; await writeChar.writeValue(hexToBytes(LIVE_CMD_HEX)); }
+      catch(e) { console.error(e); } finally { writeInProgress = false; }
+    }
+    async function sendInitCmd() {
+      if (!writeChar) return console.warn("Not connected");
+      if (writeInProgress) return console.warn("Write in progress");
+      try { writeInProgress = true; await writeChar.writeValue(hexToBytes(INIT_CMD_HEX)); }
+      catch(e) { console.error(e); } finally { writeInProgress = false; }
+    }
+
+    function startAuto() {
+      if (autoIntervalId !== null) return;
+      if (!writeChar) { alert("Not connected"); return; }
+      autoStatus.textContent = "Auto: ON";
+      startAutoBtn.disabled = true;
+      stopAutoBtn.disabled = false;
+      autoIntervalId = setInterval(() => { if (!writeInProgress) sendLiveCmd(); }, 500);
+    }
+    function stopAuto() {
+      if (autoIntervalId !== null) clearInterval(autoIntervalId);
+      autoIntervalId = null;
+      autoStatus.textContent = "Idle";
+      startAutoBtn.disabled = false;
+      stopAutoBtn.disabled = true;
+    }
+
+    async function connect() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: "CARCAT" }, { name: "CARCAT_5G" }],
+          optionalServices: [serviceUuid],
+        });
+        server = await device.gatt.connect();
+        const svc = await server.getPrimaryService(serviceUuid);
+        notifyChar = await svc.getCharacteristic(notifyCharUuid);
+        writeChar = await svc.getCharacteristic(writeCharUuid);
+
+        await notifyChar.startNotifications();
+        notifyChar.addEventListener("characteristicvaluechanged", onNotify);
+
+        connectButton.disabled = true;
+        disconnectButton.disabled = false;
+        sendLiveBtn.disabled = false;
+        startAutoBtn.disabled = false;
+        sendInitBtn.disabled = false;
+        forceParseInit.disabled = false;
+      } catch (e) {
+        alert("Connect failed: " + e);
+      }
+    }
+
+    async function disconnect() {
+      try { if (device && device.gatt.connected) device.gatt.disconnect(); }
+      finally {
+        connectButton.disabled = false;
+        disconnectButton.disabled = true;
+        sendLiveBtn.disabled = true;
+        startAutoBtn.disabled = true;
+        stopAuto();
+        sendInitBtn.disabled = true;
+        forceParseInit.disabled = true;
+      }
+    }
+
+    // Main notify handler — strict checks at bytes 6..9
+    function onNotify(ev) {
+      const arr = new Uint8Array(ev.target.value.buffer);
+
+      // LIVE
+      if (isTagAt(arr, 6, "LIVE") && arr.length >= 28) {
+        appendRaw(arr, 'LIVE');
+        const liveParsed = parseLivePacket(arr);
+        if (!liveParsed.error) showLive(liveParsed);
+        return;
+      }
+
+      // INIT
+      if (isTagAt(arr, 6, "INIT") && arr.length >= 51) {
+        appendRaw(arr, 'INIT');
+        const initParsed = parseInitPacket(arr);
+        if (!initParsed.error) {
+          showInit(initParsed);
+          // check for pending save ack: byte index 10 === 1 indicates save acknowledgement
+          try {
+            const buf = initParsed._rawBuf;
+            if (pendingSave && buf && buf.length > 10 && buf[10] === 1) {
+              // resolve pending save
+              pendingSave.resolve({feature: pendingSave.feature, value: pendingSave.value, buf});
+              // clear pending object handled by resolver
+            }
+          } catch (e) { console.warn("ack check error", e); }
+        }
+        return;
+      }
+
+      // unknown packet
+      appendRaw(arr, '');
+    }
+
+    // force parse utilities
+    function forceParseLive() {
+      if (!lastPacket) return alert("No packet available");
+      if (!isTagAt(lastPacket, 6, "LIVE")) return alert("Latest packet does not have 'LIVE' at bytes 6..9 — parsing skipped.");
+      if (lastPacket.length < 28) return alert("LIVE packet too short (need ≥28 bytes).");
+      const parsed = parseLivePacket(lastPacket);
+      if (parsed.error) alert(parsed.error); else showLive(parsed);
+    }
+    function forceParseInitFn() {
+      if (!lastPacket) return alert("No packet available");
+      if (!isTagAt(lastPacket, 6, "INIT")) return alert("Latest packet does not have 'INIT' at bytes 6..9 — parsing skipped.");
+      if (lastPacket.length < 51) return alert("INIT packet too short (need ≥51 bytes).");
+      const parsed = parseInitPacket(lastPacket);
+      if (parsed.error) alert(parsed.error); else showInit(parsed);
+    }
+
+    // wire UI
+    connectButton.addEventListener("click", connect);
+    disconnectButton.addEventListener("click", disconnect);
+    sendLiveBtn.addEventListener("click", sendLiveCmd);
+    startAutoBtn.addEventListener("click", startAuto);
+    stopAutoBtn.addEventListener("click", stopAuto);
+    sendInitBtn.addEventListener("click", sendInitCmd);
+
+    clearRaw.addEventListener("click", () => recvRaw.innerHTML = "");
+    forceParse.addEventListener("click", forceParseLive);
+    forceParseInit.addEventListener("click", forceParseInitFn);
+
+    copyParsed.addEventListener("click", async () => {
+      const lines = [
+        `Battery (V): ${battery_V.value}`,
+        `Current (mA): ${current_mA.value}`,
+        `Temp (°C): ${tempC.value}`,
+        `Min (kHz): ${minkHz.value}`,
+        `Max (kHz): ${maxkHz.value}`,
+        `Wave: ${waveVel.value}`,
+        `Pattern: ${pattern.value}`,
+        `Days: ${days.value}`,
+        `HH:MM:SS: ${hhmmss.value}`
+      ].join("\n");
+      await navigator.clipboard.writeText(lines);
+      alert("LIVE parsed copied to clipboard");
+    });
+
+    copyInit.addEventListener("click", async () => {
+      const lines = [
+        `Audible beep: ${beep_enabled.value} (default: ${beep_en_default.value}), set=${beep_value.value}, min=${beep_min.value}, max=${beep_max.value}, default=${beep_default.value}`,
+        `Standby mode: ${standby_enabled.value} (default: ${standby_en_default.value}), set=${standby_value.value}, min=${standby_min.value}, max=${standby_max.value}, default=${standby_default.value}`,
+        `Shutdown mode: ${shutdown_enabled.value} (default: ${shutdown_en_default.value}), set=${shutdown_value.value}, min=${shutdown_min.value}, max=${shutdown_max.value}, default=${shutdown_default.value}`,
+        `Audible Hiss band: ${hiss_enabled.value} (default: ${hiss_en_default.value}), set=${hiss_value.value}, min=${hiss_min.value}, max=${hiss_max.value}, default=${hiss_default.value}`
+      ].join("\n");
+      await navigator.clipboard.writeText(lines);
+      alert("INIT parsed copied to clipboard");
+    });
+
+    /* ----------------------------
+       Modal logic and SAVE with ACK wait
+       -----------------------------*/
+    const editButtons = document.querySelectorAll('.editBtn');
+
+    function updateModalSliderValueDisplaySeconds() { modalSliderValue.textContent = `${modalSlider.value} s`; }
+    function updateModalSliderValueDisplayVolts() { modalSliderValue.textContent = `${(modalSlider.value/1000).toFixed(3)} V`; }
+    function updateModalSliderValueDisplayPercent() { modalSliderValue.textContent = `${modalSlider.value} %`; }
+
+    function openFeatureModal(featureKey) {
+      if (!currentInitData) return alert("No INIT data available yet. Request INIT first.");
+      const data = currentInitData[featureKey];
+      if (!data) return alert("Feature data missing.");
+
+      editingFeature = featureKey;
+      modalTitle.textContent = {beep:"Audible beep", standby:"Standby mode", shutdown:"Shutdown mode", hiss:"Audible Hiss band"}[featureKey] || "Feature";
+
+      if (data.enabled) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+
+      if (featureKey === 'beep') {
+        modalSlider.min = data.min ?? 0;
+        modalSlider.max = data.max ?? Math.max((data.min||0)+1, data.value||0);
+        modalSlider.step = 1;
+        modalSlider.value = data.value ?? data.def ?? modalSlider.min;
+        sliderLabel.textContent = "Duration - (after every)";
+        sliderMinLabel.textContent = `${modalSlider.min} s`;
+        sliderMaxLabel.textContent = `${modalSlider.max} s`;
+        updateModalSliderValueDisplaySeconds();
+      } else if (featureKey === 'standby' || featureKey === 'shutdown') {
+        const rawMin = data.min_mV ?? 0;
+        const rawMax = data.max_mV ?? Math.max((rawMin)+1, data.value_mV||0);
+        modalSlider.min = rawMin;
+        modalSlider.max = rawMax;
+        modalSlider.step = 1;
+        modalSlider.value = data.value_mV ?? data.def_mV ?? modalSlider.min;
+        sliderLabel.textContent = featureKey === 'standby' ? "Charging voltage threshold" : "Cut-off voltage";
+        sliderMinLabel.textContent = `${(rawMin/1000).toFixed(3)} V`;
+        sliderMaxLabel.textContent = `${(rawMax/1000).toFixed(3)} V`;
+        updateModalSliderValueDisplayVolts();
+      } else if (featureKey === 'hiss') {
+        modalSlider.min = data.min_pct ?? 0;
+        modalSlider.max = data.max_pct ?? Math.max((data.min_pct||0)+1, data.value_pct||0);
+        modalSlider.step = 1;
+        modalSlider.value = data.value_pct ?? data.def_pct ?? modalSlider.min;
+        sliderLabel.textContent = "Play frequency (band %)";
+        sliderMinLabel.textContent = `${modalSlider.min} %`;
+        sliderMaxLabel.textContent = `${modalSlider.max} %`;
+        updateModalSliderValueDisplayPercent();
+      }
+
+      modalBackdrop.style.display = 'flex';
+    }
+
+    modalToggle.addEventListener('click', () => modalToggle.classList.toggle('on'));
+    modalSlider.addEventListener('input', () => {
+      if (!editingFeature) return;
+      if (editingFeature === 'beep') updateModalSliderValueDisplaySeconds();
+      else if (editingFeature === 'standby' || editingFeature === 'shutdown') updateModalSliderValueDisplayVolts();
+      else if (editingFeature === 'hiss') updateModalSliderValueDisplayPercent();
+    });
+
+    modalReset.addEventListener('click', () => {
+      if (!editingFeature || !currentInitData) return;
+      const d = currentInitData[editingFeature];
+      if (!d) return;
+      if (editingFeature === 'beep') { modalSlider.value = d.def ?? d.value ?? modalSlider.min; updateModalSliderValueDisplaySeconds(); }
+      else if (editingFeature === 'standby' || editingFeature === 'shutdown') { modalSlider.value = d.def_mV ?? d.value_mV ?? modalSlider.min; updateModalSliderValueDisplayVolts(); }
+      else if (editingFeature === 'hiss') { modalSlider.value = d.def_pct ?? d.value_pct ?? modalSlider.min; updateModalSliderValueDisplayPercent(); }
+    });
+
+    modalClose.addEventListener('click', closeModal);
+    modalBackdrop.addEventListener('click', (ev) => { if (ev.target === modalBackdrop) closeModal(); });
+    function closeModal() { modalBackdrop.style.display = 'none'; editingFeature = null; }
+
+    // waitForInitAck returns a promise resolved when an INIT with byte 10==1 arrives or rejects after timeout
+    function waitForInitAck(timeoutMs = 5000) {
+      if (pendingSave) throw new Error("pendingSave already exists");
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          // timeout: clear pendingSave and reject
+          if (pendingSave) {
+            pendingSave = null;
+            reject(new Error("timeout"));
+          } else {
+            reject(new Error("timeout"));
+          }
+        }, timeoutMs);
+        pendingSave = { resolve: (info) => { clearTimeout(timer); pendingSave = null; resolve(info); }, reject: (err) => { clearTimeout(timer); pendingSave = null; reject(err); } };
+      });
+    }
+
+    // Save behavior: build frame, send, wait for INIT ack byte10==1 (5s). Update UI only on ACK.
+    async function performSaveWrite(featureKey, enabledNow, sliderRaw) {
+      if (!writeChar) throw new Error("Not connected");
+      if (writeInProgress) throw new Error("Write in progress");
+      const cmd = CMD_BYTES[featureKey];
+      if (!cmd) throw new Error("Unknown feature cmd");
+
+      // Build frame: FD FC FB FA 07 00 CMD(4) EN(1) VAL_L VAL_H 04 03 02 01
+      const frame = new Uint8Array(4 + 2 + 4 + 1 + 2 + 4);
+      let p = 0;
+      frame[p++] = 0xFD; frame[p++] = 0xFC; frame[p++] = 0xFB; frame[p++] = 0xFA;
+      frame[p++] = 0x07; frame[p++] = 0x00;
+      frame[p++] = cmd[0]; frame[p++] = cmd[1]; frame[p++] = cmd[2]; frame[p++] = cmd[3];
+      frame[p++] = enabledNow & 0xFF;
+      frame[p++] = sliderRaw & 0xFF;
+      frame[p++] = (sliderRaw >> 8) & 0xFF;
+      frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
+
+      writeInProgress = true;
+      try {
+        await writeChar.writeValue(frame);
+        console.log("Save frame sent:", bytesToHexUpper(frame));
+      } finally {
+        writeInProgress = false;
+      }
+
+      // wait for INIT ack (byte 10 == 1)
+      return waitForInitAck(5000);
+    }
+
+    // Save button handler — uses performSaveWrite and waits for ACK to update UI and close modal
+    modalSave.addEventListener('click', async () => {
+      if (!editingFeature || !currentInitData) { closeModal(); return; }
+      if (!writeChar) return alert("Not connected — can't send save command");
+      if (writeInProgress) return alert("Write in progress — try again");
+
+      const enabledNow = modalToggle.classList.contains('on') ? 1 : 0;
+      const sliderRaw = parseInt(modalSlider.value, 10);
+
+      modalSave.disabled = true;
+      const prevText = modalSave.textContent;
+      modalSave.textContent = "Saving...";
+
+      try {
+        // send & wait for ack
+        await performSaveWrite(editingFeature, enabledNow, sliderRaw);
+        // ACK received: update currentInitData (so UI shows new values) and refresh display
+        if (editingFeature === 'beep') {
+          currentInitData.beep.enabled = (enabledNow === 1);
+          currentInitData.beep.value = sliderRaw;
+        } else if (editingFeature === 'standby') {
+          currentInitData.standby.enabled = (enabledNow === 1);
+          currentInitData.standby.value_mV = sliderRaw;
+        } else if (editingFeature === 'shutdown') {
+          currentInitData.shutdown.enabled = (enabledNow === 1);
+          currentInitData.shutdown.value_mV = sliderRaw;
+        } else if (editingFeature === 'hiss') {
+          currentInitData.hiss.enabled = (enabledNow === 1);
+          currentInitData.hiss.value_pct = sliderRaw;
+        }
+        // show updated values
+        showInit(currentInitData);
+        // close modal on success
+        closeModal();
+        alert("Save acknowledged (INIT byte10=1).");
+      } catch (err) {
+        console.warn("Save ACK error:", err);
+        alert("No response received (timeout). Save not acknowledged.");
+        // keep modal open for retry
+      } finally {
+        modalSave.disabled = false;
+        modalSave.textContent = prevText;
+      }
+    });
+
+    // onNotify resolution: when INIT arrives with byte10==1 we resolve pendingSave if any (handled inside onNotify above)
+
+    // attach edit handlers
+    editButtons.forEach(btn => btn.addEventListener('click', () => openFeatureModal(btn.dataset.feature)));
+
+    // cleanup
+    window.addEventListener("beforeunload", () => { stopAuto(); });
+
+    if (!navigator.bluetooth) {
+      alert("Web Bluetooth not available in this browser.");
+      connectButton.disabled = true;
+      startAutoBtn.disabled = true;
+      sendInitBtn.disabled = true;
+      forceParseInit.disabled = true;
+    }
+  </script>
+</body>
+</html>

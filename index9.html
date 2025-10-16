@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CARCAT 5G — Dashboard (BLE) — Cards + Feature Edit</title>
+<style>
+  :root{
+    --bg:#0f1114; --card:#14202a; --muted:#9fb0c0;
+    --accent-green:#27b56b; --accent-blue:#3b82f6; --accent-light:#67e8f9;
+    --glass: rgba(255,255,255,0.03); --card-radius:14px;
+  }
+  html,body{height:100%;margin:0;font-family:Inter, "Segoe UI", Roboto, Arial; background:linear-gradient(180deg,#0b0c0e 0%, #0f1114 100%); color:#e6eef6;}
+  .wrap{max-width:1120px;margin:18px auto;padding:18px;display:grid;grid-template-columns:360px 1fr;gap:18px;}
+  .left{display:flex;flex-direction:column;gap:18px;}
+  .hero{background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:var(--card-radius);padding:18px;border-left:6px solid var(--accent-green);}
+  .hero h1{margin:0;font-size:20px}
+  .hero p{margin:8px 0 0 0;color:var(--muted);font-size:13px;}
+  .hero .brand{display:flex;align-items:center;gap:10px;margin-top:12px;}
+  .small-card{background:var(--card); padding:12px; border-radius:12px; border-left:6px solid var(--accent-blue); color:inherit}
+
+  /* Grid right */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+  .tile{background:var(--card); border-radius:var(--card-radius); padding:18px; position:relative; overflow:hidden; box-shadow:0 6px 20px rgba(3,6,9,0.6);}
+  .tile .heading{font-size:16px;font-weight:800;margin-bottom:8px;color:#fff}
+  .tile .sub{color:var(--muted);font-size:13px;margin-top:8px}
+  .metric{display:flex;align-items:center;gap:12px}
+  .metric .value{font-size:26px;font-weight:800}
+  .metric .unit{color:var(--muted);font-size:12px}
+  .feature-card { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .feature-left {flex:1}
+  .feature-title { font-weight:800 }
+  .feature-sub { color:var(--muted); font-size:12px; margin-top:6px }
+  .feature-value { font-size:20px; font-weight:800; margin-top:6px }
+  .gear { border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); padding:8px; cursor:pointer; color:var(--accent-light) }
+  .small-muted { color:var(--muted); font-size:12px }
+  .raw { background:var(--glass); padding:10px; border-radius:10px; font-family:monospace; color:#9fffbf; font-size:13px; height:120px; overflow:auto; border:1px solid rgba(255,255,255,0.03) }
+  .footer{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding:12px 18px;background:transparent}
+  .connectBtn{padding:8px 14px;border-radius:10px;background:linear-gradient(90deg,var(--accent-blue),#9be7ff);color:#072031;border:none;cursor:pointer;font-weight:700}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:8px 12px;border-radius:10px;cursor:pointer}
+  .badge { display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.03); font-weight:700; color:var(--muted); font-size:13px }
+
+  /* modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:2000}
+  .modal{width:420px;background:#f2f8ff;color:#0b1220;border-radius:12px;padding:18px;box-shadow:0 6px 30px rgba(0,0,0,0.25);position:relative}
+  .modal h2{margin:0 0 8px 0;text-align:center}
+  .toggle{display:flex;justify-content:center;align-items:center;gap:12px;margin:8px 0 14px 0}
+  .switch{width:54px;height:30px;background:#ddd;border-radius:18px;position:relative}
+  .switch.on{background:#111}
+  .knob{width:24px;height:24px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:left .12s;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+  .switch.on .knob{left:27px}
+  .modal input[type="range"]{width:100%}
+  .muted{color:var(--muted)}
+  @media (max-width:980px){.wrap{grid-template-columns:1fr;padding:12px}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- LEFT COLUMN -->
+    <div class="left">
+      <div class="hero">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h1>CARCAT 5G - Wave</h1>
+            <p>Car Battery Monitor & Config — BLE control & live telemetry</p>
+          </div>
+          <div style="text-align:right">
+            <div class="muted">Connected to:</div>
+            <div id="deviceName" class="badge">Not connected</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <button id="connectButton" class="connectBtn">Connect</button>
+          <button id="disconnectButton" class="btn-ghost" disabled>Disconnect</button>
+          <button id="sendLiveBtn" class="btn-ghost" disabled>SEND LIVE</button>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button id="sendInitBtn" class="btn-ghost" disabled>SEND INIT</button>
+          <button id="startAutoBtn" class="btn-ghost" disabled>Start Auto (500ms)</button>
+          <button id="stopAutoBtn" class="btn-ghost" disabled>Stop Auto</button>
+        </div>
+
+        <div style="margin-top:12px" class="muted">Raw receive (Docklight hex)</div>
+        <div id="recvRaw" class="raw"></div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button id="clearRaw" class="btn-ghost">Clear</button>
+          <button id="forceParse" class="btn-ghost">Force LIVE Parse</button>
+        </div>
+      </div>
+
+      <div class="small-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700">Quick</div>
+            <div class="muted" style="margin-top:6px">Console logs for TX/RX are in browser console</div>
+          </div>
+          <div>
+            <button id="openSetup" class="btn-ghost">Setup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:18px;font-weight:800">Dashboard</div>
+        <div class="muted">Auto: <span id="autoStatus">Idle</span></div>
+      </div>
+
+      <div class="grid">
+        <!-- Current Voltage (LIVE) -->
+        <div class="tile" id="card_voltage" style="border-left:6px solid var(--accent-green)">
+          <div class="heading">Car Battery Voltage</div>
+          <div class="metric">
+            <div class="value" id="card_battery">-- V</div>
+            <div class="unit muted" id="liveExtra">instant</div>
+          </div>
+          <div class="sub" id="card_battery_sub">From LIVE packet</div>
+        </div>
+
+        <!-- Temperature -->
+        <div class="tile" id="card_temp" style="border-left:6px solid #d6a93e">
+          <div class="heading">Internal Temperature</div>
+          <div class="feature-value" id="card_temp_value">-- °C</div>
+          <div class="sub">CARCAT internal temperature</div>
+        </div>
+
+        <!-- Min / Max Frequency -->
+        <div class="tile" id="card_freq_min" style="border-left:6px solid var(--accent-green)">
+          <div class="heading">Min Frequency (current)</div>
+          <div class="feature-value" id="card_minfreq">-- kHz</div>
+          <div class="sub">From LIVE packet</div>
+        </div>
+        <div class="tile" id="card_freq_max" style="border-left:6px solid #ff9f6b">
+          <div class="heading">Max Frequency (current)</div>
+          <div class="feature-value" id="card_maxfreq">-- kHz</div>
+          <div class="sub">From LIVE packet</div>
+        </div>
+
+        <!-- Wave velocity -->
+        <div class="tile" id="card_wave" style="border-left:6px solid #9b62ff">
+          <div class="heading">Wave velocity (current)</div>
+          <div class="feature-value" id="card_waveval">--</div>
+          <div class="sub">From LIVE packet</div>
+        </div>
+
+        <!-- Pattern -->
+        <div class="tile" id="card_pattern" style="border-left:6px solid var(--accent-blue)">
+          <div class="heading">Ultrasound pattern</div>
+          <div class="feature-value" id="card_pattern_val">--</div>
+          <div class="sub">From LIVE packet</div>
+        </div>
+
+        <!-- Uptime -->
+        <div class="tile" id="card_uptime" style="border-left:6px solid #5b2133">
+          <div class="heading">Device UP-Time</div>
+          <div class="feature-value" id="card_days">-- Days</div>
+          <div class="sub" id="card_hhmmss">--:--:-- (HH:MM:SS)</div>
+        </div>
+
+        <!-- INIT features area: each feature gets a tile showing its current state and defaults -->
+        <div class="tile" id="feat_beep_card" style="border-left:6px solid #ff6fa6">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="feature-title">Audible beep</div>
+              <div class="feature-sub">Duration — after every</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              <div id="beep_enabled_card" class="muted">Disabled</div>
+              <div class="gear" data-feature="beep" title="Edit audible beep">⚙</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small-muted">Set value</div>
+              <div class="feature-value" id="beep_set">-- s</div>
+            </div>
+            <div>
+              <div class="small-muted">Default</div>
+              <div class="small-muted" id="beep_default_card">-- s</div>
+            </div>
+            <div>
+              <div class="small-muted">Slider min/max</div>
+              <div class="small-muted" id="beep_minmax">-- / -- s</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile" id="feat_standby_card" style="border-left:6px solid #39d0ff">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="feature-title">Standby mode</div>
+              <div class="feature-sub">Charging voltage threshold</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              <div id="standby_enabled_card" class="muted">Disabled</div>
+              <div class="gear" data-feature="standby" title="Edit standby">⚙</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small-muted">Set value</div>
+              <div class="feature-value" id="standby_set">-- V</div>
+            </div>
+            <div>
+              <div class="small-muted">Default</div>
+              <div class="small-muted" id="standby_default_card">-- V</div>
+            </div>
+            <div>
+              <div class="small-muted">Slider min/max</div>
+              <div class="small-muted" id="standby_minmax">-- / -- V</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile" id="feat_shutdown_card" style="border-left:6px solid #b77a4f">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="feature-title">Shutdown mode</div>
+              <div class="feature-sub">Cut-off voltage</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              <div id="shutdown_enabled_card" class="muted">Disabled</div>
+              <div class="gear" data-feature="shutdown" title="Edit shutdown">⚙</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small-muted">Set value</div>
+              <div class="feature-value" id="shutdown_set">-- V</div>
+            </div>
+            <div>
+              <div class="small-muted">Default</div>
+              <div class="small-muted" id="shutdown_default_card">-- V</div>
+            </div>
+            <div>
+              <div class="small-muted">Slider min/max</div>
+              <div class="small-muted" id="shutdown_minmax">-- / -- V</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile" id="feat_hiss_card" style="border-left:6px solid #2fd1a6">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="feature-title">Audible Hiss band</div>
+              <div class="feature-sub">Play frequency</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              <div id="hiss_enabled_card" class="muted">Disabled</div>
+              <div class="gear" data-feature="hiss" title="Edit hiss">⚙</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small-muted">Set value</div>
+              <div class="feature-value" id="hiss_set">-- %</div>
+            </div>
+            <div>
+              <div class="small-muted">Default</div>
+              <div class="small-muted" id="hiss_default_card">-- %</div>
+            </div>
+            <div>
+              <div class="small-muted">Slider min/max</div>
+              <div class="small-muted" id="hiss_minmax">-- / -- %</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- footer -->
+      <div class="footer">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div id="statusDot" style="width:12px;height:12px;border-radius:50%;background:#ff6b6b"></div>
+          <div class="muted" id="bleText">Disconnected</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="copyParsed" class="btn-ghost">Copy LIVE</button>
+          <button id="copyInit" class="btn-ghost">Copy INIT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal (edit feature) -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true" id="featureModal">
+      <span class="closeX" id="modalClose" style="position:absolute;right:12px;top:8px;cursor:pointer">✕</span>
+      <h2 id="modalTitle">Feature</h2>
+
+      <div class="toggle">
+        <div class="muted">Disabled</div>
+        <div class="switch" id="modalToggle"><div class="knob"></div></div>
+        <div class="muted">Enabled</div>
+      </div>
+
+      <div style="height:1px;background:#dfe9f1;margin:8px 0"></div>
+
+      <div style="text-align:center">
+        <div class="muted" id="sliderLabel">Duration</div>
+        <input type="range" id="modalSlider" min="0" max="100" step="1" style="width:100%;margin-top:12px" />
+        <div id="modalSliderValue" style="font-weight:800;margin-top:10px">0</div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <div class="muted" id="sliderMinLabel">min</div>
+          <div class="muted" id="sliderMaxLabel">max</div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:14px">
+        <button id="modalReset" class="btn-ghost">Reset</button>
+        <div style="display:flex;gap:8px">
+          <button id="modalSave" class="connectBtn">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------------------------
+ BLE + parsing + UI wiring
+ ---------------------------*/
+const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
+const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
+const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
+
+const LIVE_CMD_HEX = "FD FC FB FA 04 00 4C 49 56 45 04 03 02 01";
+const INIT_CMD_HEX = "FD FC FB FA 04 00 49 4E 49 54 04 03 02 01";
+
+// CMD bytes
+const CMD_BYTES = {
+  beep: [0x42,0x45,0x45,0x50],     // "BEEP"
+  standby: [0x53,0x54,0x41,0x4E],  // "STAN"
+  shutdown: [0x53,0x48,0x55,0x54], // "SHUT"
+  hiss: [0x48,0x49,0x53,0x53]      // "HISS"
+};
+
+// DOM refs
+const connectButton = document.getElementById("connectButton");
+const disconnectButton = document.getElementById("disconnectButton");
+const sendLiveBtn = document.getElementById("sendLiveBtn");
+const sendInitBtn = document.getElementById("sendInitBtn");
+const startAutoBtn = document.getElementById("startAutoBtn");
+const stopAutoBtn = document.getElementById("stopAutoBtn");
+const recvRaw = document.getElementById("recvRaw");
+const clearRaw = document.getElementById("clearRaw");
+const forceParse = document.getElementById("forceParse");
+const deviceName = document.getElementById("deviceName");
+const bleText = document.getElementById("bleText");
+const statusDot = document.getElementById("statusDot");
+const autoStatus = document.getElementById("autoStatus");
+
+// LIVE card elements
+const card_battery = document.getElementById("card_battery");
+const card_temp_value = document.getElementById("card_temp_value");
+const card_minfreq = document.getElementById("card_minfreq");
+const card_maxfreq = document.getElementById("card_maxfreq");
+const card_waveval = document.getElementById("card_waveval");
+const card_pattern_val = document.getElementById("card_pattern_val");
+const card_days = document.getElementById("card_days");
+const card_hhmmss = document.getElementById("card_hhmmss");
+const avgVoltage = document.getElementById("avgVoltage"); // optional
+
+// INIT feature card elements
+const beep_enabled_card = document.getElementById("beep_enabled_card");
+const beep_set = document.getElementById("beep_set");
+const beep_default_card = document.getElementById("beep_default_card");
+const beep_minmax = document.getElementById("beep_minmax");
+
+const standby_enabled_card = document.getElementById("standby_enabled_card");
+const standby_set = document.getElementById("standby_set");
+const standby_default_card = document.getElementById("standby_default_card");
+const standby_minmax = document.getElementById("standby_minmax");
+
+const shutdown_enabled_card = document.getElementById("shutdown_enabled_card");
+const shutdown_set = document.getElementById("shutdown_set");
+const shutdown_default_card = document.getElementById("shutdown_default_card");
+const shutdown_minmax = document.getElementById("shutdown_minmax");
+
+const hiss_enabled_card = document.getElementById("hiss_enabled_card");
+const hiss_set = document.getElementById("hiss_set");
+const hiss_default_card = document.getElementById("hiss_default_card");
+const hiss_minmax = document.getElementById("hiss_minmax");
+
+// modal refs
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalToggle = document.getElementById('modalToggle');
+const modalSlider = document.getElementById('modalSlider');
+const modalSliderValue = document.getElementById('modalSliderValue');
+const sliderLabel = document.getElementById('sliderLabel');
+const sliderMinLabel = document.getElementById('sliderMinLabel');
+const sliderMaxLabel = document.getElementById('sliderMaxLabel');
+const modalReset = document.getElementById('modalReset');
+const modalSave = document.getElementById('modalSave');
+const modalClose = document.getElementById('modalClose');
+const modalTitle = document.getElementById('modalTitle');
+
+let device, server, notifyChar, writeChar;
+let lastPacket = null;
+let currentInitData = null;
+let autoIntervalId = null;
+let writeInProgress = false;
+let editingFeature = null;
+let pendingSave = null;
+
+// simple voltage buffer
+let voltageBuffer = new Array(200).fill(12345);
+
+/* helpers */
+function hexToBytes(hexStr){
+  const cleaned = hexStr.replace(/0x/g,"").replace(/[^A-Fa-f0-9]/g,"");
+  const out = new Uint8Array(cleaned.length/2);
+  for(let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
+  return out

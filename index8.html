@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CARCAT 5G — Dashboard (BLE)</title>
+<style>
+  :root{
+    --bg:#0f1114;
+    --card:#14202a;
+    --muted:#9fb0c0;
+    --accent-green:#27b56b;
+    --accent-blue:#3b82f6;
+    --accent-light:#67e8f9;
+    --glass: rgba(255,255,255,0.03);
+    --card-radius:14px;
+  }
+  html,body{height:100%;margin:0;font-family:Inter, "Segoe UI", Roboto, Arial; background:linear-gradient(180deg,#0b0c0e 0%, #0f1114 100%); color:#e6eef6;}
+  .wrap{max-width:1120px;margin:18px auto;padding:18px;display:grid;grid-template-columns:360px 1fr;gap:18px;}
+  /* Left column - hero + small controls */
+  .left {
+    display:flex; flex-direction:column; gap:18px;
+  }
+  .hero {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius: var(--card-radius); padding:18px; position:relative; overflow:hidden;
+    border-left:6px solid var(--accent-green);
+  }
+  .hero h1{margin:0;font-size:20px;letter-spacing:0.6px}
+  .hero p{margin:8px 0 0 0;color:var(--muted);font-size:13px;}
+  .hero .brand {display:flex;align-items:center;gap:10px;margin-top:12px;}
+  .hero .brand img{width:46px;height:46px;border-radius:8px;object-fit:cover;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+  .hero .brand .title{font-size:18px;font-weight:700}
+  .small-card {
+    background:var(--card); padding:12px; border-radius:12px; border-left:6px solid var(--accent-blue);
+  }
+
+  /* Right column - dashboard tiles */
+  .grid {
+    display:grid; grid-template-columns:repeat(2,1fr); gap:14px;
+  }
+  .tile {
+    background:var(--card); border-radius:var(--card-radius); padding:18px; position:relative; overflow:hidden; box-shadow:0 6px 20px rgba(3,6,9,0.6);
+  }
+  .tile .heading { font-size:18px; font-weight:700; margin-bottom:6px; color:#fff; }
+  .tile .sub { color:var(--muted); font-size:13px; margin-top:8px; }
+
+  /* Large metric */
+  .metric { display:flex; align-items:center; gap:16px; }
+  .metric .value { font-size:28px; font-weight:800; }
+  .metric .unit { color:var(--muted); font-size:13px; }
+
+  /* Min/Max tile */
+  .minmax { font-size:20px; font-weight:800; }
+  .health { font-size:20px; font-weight:800; color:var(--accent-blue); }
+
+  /* chart tile */
+  .chart { height:200px; background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent); border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:8px;}
+  canvas { width:100%; height:160px; background:transparent; border-radius:6px; }
+
+  /* timeline config */
+  .config { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .config .edit { background:transparent;border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,0.04); cursor:pointer; color:var(--accent-light); }
+
+  /* raw receive area */
+  .raw {
+    background:var(--glass); padding:12px; border-radius:12px; font-family:monospace; color:#9fffbf; font-size:13px; height:140px; overflow:auto; border:1px solid rgba(255,255,255,0.03);
+  }
+
+  /* Footer bar with connect */
+  .footer { grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:12px 18px; background:transparent; }
+  .bleStatus { display:flex; gap:10px; align-items:center; }
+  .connectBtn { padding:8px 14px; border-radius:10px; background:linear-gradient(90deg,var(--accent-blue), #9be7ff); color:#072031; border:none; cursor:pointer; font-weight:700; }
+  .btn-ghost { background:transparent; border:1px solid rgba(255,255,255,0.05); color:var(--muted); padding:8px 12px; border-radius:10px; cursor:pointer; }
+
+  /* modal (same as before) */
+  .modal-backdrop { position:fixed; inset:0; background: rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:2000; }
+  .modal { width:420px; background:#f2f8ff; color:#0b1220; border-radius:12px; padding:18px; box-shadow:0 6px 30px rgba(0,0,0,0.25); position:relative; }
+  .modal h2{margin:0 0 8px 0;text-align:center}
+  .toggle { display:flex; justify-content:center; align-items:center; gap:12px; margin:8px 0 14px 0; }
+  .switch { width:54px; height:30px; background:#ddd; border-radius:18px; position:relative; }
+  .switch.on { background:#111; }
+  .knob { width:24px; height:24px; background:#fff; border-radius:50%; position:absolute; top:3px; left:3px; transition:left .12s; box-shadow:0 2px 4px rgba(0,0,0,0.2); }
+  .switch.on .knob { left:27px; }
+
+  /* small helpers */
+  .muted { color:var(--muted); font-size:13px; }
+  .leftStack{display:flex;flex-direction:column;gap:12px}
+  @media (max-width:980px){
+    .wrap{grid-template-columns:1fr; padding:12px}
+    .grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- LEFT COLUMN -->
+    <div class="left">
+      <div class="hero">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h1>CARCAT 5G - Wave</h1>
+            <p>Car Battery Monitor & Config — BLE control & live telemetry</p>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700;font-size:13px">Connected to:</div>
+            <div id="deviceName" class="muted">Not connected</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <button id="connectButton" class="connectBtn">Connect</button>
+          <button id="disconnectButton" class="btn-ghost" disabled>Disconnect</button>
+          <button id="sendLiveBtn" class="btn-ghost" disabled>SEND LIVE</button>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button id="sendInitBtn" class="btn-ghost" disabled>SEND INIT</button>
+          <button id="startAutoBtn" class="btn-ghost" disabled>Start Auto (500ms)</button>
+          <button id="stopAutoBtn" class="btn-ghost" disabled>Stop Auto</button>
+        </div>
+
+        <div style="margin-top:12px" class="muted">Raw receive (Docklight hex)</div>
+        <div id="recvRaw" class="raw"></div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button id="clearRaw" class="btn-ghost">Clear</button>
+          <button id="forceParse" class="btn-ghost">Force LIVE Parse</button>
+        </div>
+      </div>
+
+      <div class="small-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700">Controls</div>
+            <div class="muted" style="margin-top:6px">Send test commands & view console logs</div>
+          </div>
+          <div>
+            <button id="openSetup" class="btn-ghost">Setup</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN (Dashboard) -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:18px;font-weight:800">Dashboard</div>
+        <div class="muted">Auto: <span id="autoStatus">Idle</span></div>
+      </div>
+
+      <div class="grid">
+        <!-- Current Voltage -->
+        <div class="tile" id="tile_current" style="border-left:6px solid var(--accent-green)">
+          <div class="heading">Current Voltage</div>
+          <div class="metric">
+            <div class="value" id="battery_V">-- V</div>
+            <div class="unit muted" id="currentLabel">instant</div>
+          </div>
+          <div class="sub">Real-time battery voltage (from LIVE)</div>
+        </div>
+
+        <!-- Average -->
+        <div class="tile" id="tile_avg" style="border-left:6px solid var(--accent-blue)">
+          <div class="heading">200 points Average Voltage</div>
+          <div style="margin-top:8px">
+            <div class="value" id="avgVoltage">-- V</div>
+          </div>
+          <div class="sub">Average across the sample window</div>
+        </div>
+
+        <!-- Min / Max -->
+        <div class="tile" id="tile_minmax" style="border-left:6px solid var(--accent-green)">
+          <div class="heading">Min / Max Voltage</div>
+          <div style="margin-top:8px" class="minmax" id="minMax">-- / -- V</div>
+          <div class="sub">Minimum and maximum recorded voltages</div>
+        </div>
+
+        <!-- Battery Health -->
+        <div class="tile" id="tile_health" style="border-left:6px solid var(--accent-blue)">
+          <div class="heading">Battery Health</div>
+          <div style="margin-top:8px" class="health" id="health">--</div>
+          <div class="sub">Simple health indicator from voltage stats</div>
+        </div>
+
+        <!-- Chart -->
+        <div class="tile" style="grid-column:1 / -1; border-left:6px solid var(--accent-green)">
+          <div class="heading">Voltage v timeline</div>
+          <div class="chart">
+            <canvas id="voltageCanvas" width="800" height="160"></canvas>
+            <div style="display:flex;gap:12px;align-items:center;">
+              <div class="muted">Display:</div>
+              <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="display" value="line" checked> Line</label>
+              <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="display" value="area"> Area</label>
+              <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="display" value="scatter"> Scatter</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configure Timeline -->
+        <div class="tile" style="grid-column:1 / -1; border-left:6px solid var(--accent-blue)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="heading">Configure Timeline</div>
+              <div class="muted" id="timelineInfo">Total sample duration = 1 day (sample every 7.2 sec)</div>
+            </div>
+            <div>
+              <button id="editTimeline" class="edit">✎</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer controls -->
+      <div class="footer">
+        <div class="bleStatus">
+          <div id="statusDot" style="width:12px;height:12px;border-radius:50%;background:#ff6b6b"></div>
+          <div class="muted" id="bleText">Disconnected</div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button id="copyParsed" class="btn-ghost">Copy LIVE</button>
+          <button id="copyInit" class="btn-ghost">Copy INIT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal (feature editor) -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true" id="featureModal">
+      <span class="closeX" id="modalClose" style="position:absolute;right:12px;top:8px;cursor:pointer">✕</span>
+      <h2 id="modalTitle">Feature</h2>
+      <div class="toggle">
+        <div class="muted">Disabled</div>
+        <div class="switch" id="modalToggle"><div class="knob"></div></div>
+        <div class="muted">Enabled</div>
+      </div>
+
+      <div style="height:1px;background:#dfe9f1;margin:8px 0"></div>
+
+      <div style="text-align:center">
+        <div class="muted" id="sliderLabel">Duration</div>
+        <input type="range" id="modalSlider" min="0" max="100" step="1" style="width:100%;margin-top:12px" />
+        <div id="modalSliderValue" style="font-weight:800;margin-top:10px">0</div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <div class="muted" id="sliderMinLabel">min</div>
+          <div class="muted" id="sliderMaxLabel">max</div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:14px">
+        <button id="modalReset" class="btn-ghost">Reset</button>
+        <div style="display:flex;gap:8px">
+          <button id="modalSave" class="connectBtn">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------------------------
+   BLE & parser code (keeps functionality)
+   ---------------------------*/
+const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
+const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
+const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
+
+const LIVE_CMD_HEX = "FD FC FB FA 04 00 4C 49 56 45 04 03 02 01";
+const INIT_CMD_HEX = "FD FC FB FA 04 00 49 4E 49 54 04 03 02 01";
+
+// CMD bytes (BEEP corrected)
+const CMD_BYTES = {
+  beep: [0x42,0x45,0x45,0x50],     // "BEEP"
+  standby: [0x53,0x54,0x41,0x4E],  // "STAN"
+  shutdown: [0x53,0x48,0x55,0x54], // "SHUT"
+  hiss: [0x48,0x49,0x53,0x53]      // "HISS"
+};
+
+// DOM refs
+const connectButton = document.getElementById("connectButton");
+const disconnectButton = document.getElementById("disconnectButton");
+const sendLiveBtn = document.getElementById("sendLiveBtn");
+const sendInitBtn = document.getElementById("sendInitBtn");
+const startAutoBtn = document.getElementById("startAutoBtn");
+const stopAutoBtn = document.getElementById("stopAutoBtn");
+const recvRaw = document.getElementById("recvRaw");
+const clearRaw = document.getElementById("clearRaw");
+const forceParse = document.getElementById("forceParse");
+const deviceName = document.getElementById("deviceName");
+const bleText = document.getElementById("bleText");
+const statusDot = document.getElementById("statusDot");
+const autoStatus = document.getElementById("autoStatus");
+
+const battery_V = document.getElementById("battery_V");
+const avgVoltage = document.getElementById("avgVoltage");
+const minMax = document.getElementById("minMax");
+const health = document.getElementById("health");
+const copyParsed = document.getElementById("copyParsed");
+const copyInit = document.getElementById("copyInit");
+const startAuto = document.getElementById("startAutoBtn");
+const stopAuto = document.getElementById("stopAutoBtn");
+
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalToggle = document.getElementById('modalToggle');
+const modalSlider = document.getElementById('modalSlider');
+const modalSliderValue = document.getElementById('modalSliderValue');
+const sliderLabel = document.getElementById('sliderLabel');
+const sliderMinLabel = document.getElementById('sliderMinLabel');
+const sliderMaxLabel = document.getElementById('sliderMaxLabel');
+const modalReset = document.getElementById('modalReset');
+const modalSave = document.getElementById('modalSave');
+const modalClose = document.getElementById('modalClose');
+const modalTitle = document.getElementById('modalTitle');
+
+const voltageCanvas = document.getElementById('voltageCanvas');
+
+// state
+let device, server, notifyChar, writeChar;
+let lastPacket = null;
+let currentInitData = null;
+let autoIntervalId = null;
+let writeInProgress = false;
+let editingFeature = null;
+let pendingSave = null;
+
+// simple voltage buffer for the chart (just to show a timeline)
+let voltageBuffer = new Array(200).fill(12345); // store mV integers
+
+/* helpers */
+function hexToBytes(hexStr){
+  const cleaned = hexStr.replace(/0x/g,"").replace(/[^A-Fa-f0-9]/g,"");
+  const out = new Uint8Array(cleaned.length/2);
+  for(let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
+  return out;
+}
+function bytesToHexUpper(bytes){
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+}
+function appendRaw(bytes, label=''){
+  const t = new Date().toLocaleTimeString();
+  lastPacket = bytes;
+  const tag = label ? ` [${label}]` : '';
+  recvRaw.innerHTML += `[${t}]${tag} ${bytesToHexUpper(bytes)}<br>`;
+  recvRaw.scrollTop = recvRaw.scrollHeight;
+  console.log(`RX${tag}: ${bytesToHexUpper(bytes)}`);
+}
+function readU8(buf, idx){ return (idx < buf.length) ? buf[idx] : null; }
+function readU16le(buf, lo, hi){ const l=readU8(buf,lo), h=readU8(buf,hi); if(l===null||h===null) return null; return (h<<8) | l; }
+function isTagAt(buf, offset, tagStr){
+  if(!buf || buf.length < offset + tagStr.length) return false;
+  for(let i=0;i<tagStr.length;i++) if(buf[offset+i] !== tagStr.charCodeAt(i)) return false;
+  return true;
+}
+
+/* LIVE / INIT parsing (kept identical behavior & units) */
+function parseLivePacket(bytes){
+  const buf = Uint8Array.from(bytes);
+  if(buf.length < 28) return { error:"LIVE too short" };
+  return {
+    battery_mV: readU16le(buf,10,11),
+    current_mA_raw: readU16le(buf,12,13),
+    temp_raw: readU16le(buf,14,15),
+    min_Hz: readU16le(buf,16,17),
+    max_Hz: readU16le(buf,18,19),
+    waveVal: readU16le(buf,20,21),
+    pattern: readU8(buf,22),
+    days: readU16le(buf,23,24),
+    hh: readU8(buf,25), mm: readU8(buf,26), ss: readU8(buf,27),
+    rawHex: bytesToHexUpper(buf)
+  };
+}
+function showLive(obj){
+  if(!obj || obj.error){
+    battery_V.textContent="-- V";
+    return;
+  }
+  const v = (obj.battery_mV/1000).toFixed(3) + " V";
+  battery_V.textContent = v;
+  // update buffer and chart
+  voltageBuffer.push(obj.battery_mV); if(voltageBuffer.length>200) voltageBuffer.shift();
+  drawChart();
+  // update some quick stats
+  const nums = voltageBuffer.slice().map(x=>x/1000);
+  const avg = (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2);
+  avgVoltage.textContent = `${avg} V`;
+  const mn = Math.min(...nums).toFixed(2), mx = Math.max(...nums).toFixed(2);
+  minMax.textContent = `${mn} / ${mx} V`;
+  // health: simple heuristic
+  const healthText = (avg >= 12.4) ? "Excellent" : (avg >= 12.0) ? "Good" : "Poor";
+  health.textContent = healthText;
+}
+
+/* INIT parse */
+function parseInitPacket(bytes){
+  const buf = Uint8Array.from(bytes);
+  if(buf.length < 51) return { error:"INIT too short" };
+
+  const beep_en = readU8(buf,11);
+  const beep_en_default = readU8(buf,12);
+  const beep_val = readU16le(buf,13,14);
+  const beep_min = readU16le(buf,15,16);
+  const beep_max = readU16le(buf,17,18);
+  const beep_def = readU16le(buf,19,20);
+
+  const standby_en = readU8(buf,21);
+  const standby_en_default = readU8(buf,22);
+  const standby_val = readU16le(buf,23,24);
+  const standby_minv = readU16le(buf,25,26);
+  const standby_maxv = readU16le(buf,27,28);
+  const standby_defv = readU16le(buf,29,30);
+
+  const shutdown_en = readU8(buf,31);
+  const shutdown_en_default = readU8(buf,32);
+  const shutdown_val = readU16le(buf,33,34);
+  const shutdown_minv = readU16le(buf,35,36);
+  const shutdown_maxv = readU16le(buf,37,38);
+  const shutdown_defv = readU16le(buf,39,40);
+
+  const hiss_en = readU8(buf,41);
+  const hiss_en_default = readU8(buf,42);
+  const hiss_val = readU16le(buf,43,44);
+  const hiss_minv = readU16le(buf,45,46);
+  const hiss_maxv = readU16le(buf,47,48);
+  const hiss_defv = readU16le(buf,49,50);
+
+  return {
+    beep:{enabled:beep_en===1,en_default:beep_en_default===1,value:beep_val,min:beep_min,max:beep_max,def:beep_def},
+    standby:{enabled:standby_en===1,en_default:standby_en_default===1,value_mV:standby_val,min_mV:standby_minv,max_mV:standby_maxv,def_mV:standby_defv},
+    shutdown:{enabled:shutdown_en===1,en_default:shutdown_en_default===1,value_mV:shutdown_val,min_mV:shutdown_minv,max_mV:shutdown_maxv,def_mV:shutdown_defv},
+    hiss:{enabled:hiss_en===1,en_default:hiss_en_default===1,value_pct:hiss_val,min_pct:hiss_minv,max_pct:hiss_maxv,def_pct:hiss_defv},
+    rawHex: bytesToHexUpper(buf), _rawBuf: buf
+  };
+}
+
+function showInit(obj){
+  if(!obj || obj.error){ currentInitData = null; return; }
+  currentInitData = obj;
+  console.log("INIT parsed:", obj);
+}
+
+/* send helpers with logging */
+async function writeFrame(bytes, label){
+  if(!writeChar) throw new Error("Not connected");
+  console.log("TX " + label + ": " + bytesToHexUpper(bytes));
+  try { writeInProgress = true; await writeChar.writeValue(bytes); }
+  catch(e){ console.error("Write error:", e); throw e; }
+  finally{ writeInProgress = false; }
+}
+
+async function sendLiveCmd(){
+  if(writeInProgress) return console.warn("Write in progress");
+  const d = hexToBytes(LIVE_CMD_HEX);
+  await writeFrame(d, "LIVE");
+}
+async function sendInitCmd(){
+  if(writeInProgress) return console.warn("Write in progress");
+  const d = hexToBytes(INIT_CMD_HEX);
+  await writeFrame(d, "INIT");
+}
+
+/* connection & notify handling */
+async function connect(){
+  try{
+    const opts = { filters:[{ namePrefix:"CARCAT" },{ name:"CARCAT_5G" }], optionalServices:[serviceUuid] };
+    device = await navigator.bluetooth.requestDevice(opts);
+    server = await device.gatt.connect();
+    deviceName.textContent = device.name || device.id;
+    bleText.textContent = "Connected";
+    statusDot.style.background = "#27b56b";
+    const svc = await server.getPrimaryService(serviceUuid);
+    notifyChar = await svc.getCharacteristic(notifyCharUuid);
+    writeChar = await svc.getCharacteristic(writeCharUuid);
+
+    await notifyChar.startNotifications();
+    notifyChar.addEventListener("characteristicvaluechanged", onNotify);
+
+    connectButton.disabled = true;
+    disconnectButton.disabled = false;
+    sendLiveBtn.disabled = false;
+    sendInitBtn.disabled = false;
+    startAutoBtn.disabled = false;
+    console.log("Connected to", device.name || device.id);
+  }catch(e){ alert("Connect failed: "+e); console.error("Connect failed:", e); }
+}
+async function disconnect(){
+  if(device && device.gatt.connected) device.gatt.disconnect();
+  connectButton.disabled = false;
+  disconnectButton.disabled = true;
+  sendLiveBtn.disabled = true;
+  sendInitBtn.disabled = true;
+  startAutoBtn.disabled = true;
+  stopAutoBtn.disabled = true;
+  bleText.textContent = "Disconnected";
+  statusDot.style.background = "#ff6b6b";
+  console.log("Disconnected");
+}
+
+function onNotify(ev){
+  const arr = new Uint8Array(ev.target.value.buffer);
+  // label and log
+  if(isTagAt(arr,6,"LIVE") && arr.length >= 28){
+    appendRaw(arr,'LIVE');
+    const parsed = parseLivePacket(arr);
+    if(!parsed.error) showLive(parsed);
+    return;
+  }
+  if(isTagAt(arr,6,"INIT") && arr.length >= 51){
+    appendRaw(arr,'INIT');
+    const parsed = parseInitPacket(arr);
+    if(!parsed.error) {
+      showInit(parsed);
+      // check for pending save ack (byte index 10 == 1)
+      try {
+        const buf = parsed._rawBuf;
+        if(pendingSave && buf && buf.length > 10 && buf[10] === 1){
+          console.log("ACK INIT received (byte10==1) for pending save");
+          pendingSave.resolve({feature: pendingSave.feature, value: pendingSave.value, buf});
+          pendingSave = null;
+        }
+      } catch(e){ console.warn("ack check error", e); }
+    }
+    return;
+  }
+  appendRaw(arr,'');
+}
+
+/* Auto LIVE */
+function startAutoLive(){
+  if(autoIntervalId) return;
+  if(!writeChar){ alert("Not connected"); return; }
+  autoStatus.textContent = "Auto ON";
+  startAutoBtn.disabled = true;
+  stopAutoBtn.disabled = false;
+  autoIntervalId = setInterval(()=>{ if(!writeInProgress) sendLiveCmd(); },500);
+}
+function stopAutoLive(){
+  if(autoIntervalId) clearInterval(autoIntervalId);
+  autoIntervalId = null;
+  autoStatus.textContent = "Idle";
+  startAutoBtn.disabled = false;
+  stopAutoBtn.disabled = true;
+}
+
+/* simple chart draw */
+function drawChart(){
+  const ctx = voltageCanvas.getContext('2d');
+  const W = voltageCanvas.width, H = voltageCanvas.height;
+  // clear
+  ctx.clearRect(0,0,W,H);
+  // background grid
+  ctx.fillStyle = 'rgba(255,255,255,0.02)'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
+  for(let i=0;i<5;i++){ ctx.beginPath(); ctx.moveTo(0,i*(H/4)); ctx.lineTo(W,i*(H/4)); ctx.stroke(); }
+  // compute scaled points
+  const nums = voltageBuffer.map(v=>v/1000);
+  const mx = Math.max(...nums), mn = Math.min(...nums);
+  const pad = 0.2;
+  const range = (mx - mn) || 1;
+  ctx.beginPath();
+  for(let i=0;i<nums.length;i++){
+    const x = (i/(nums.length-1))*W;
+    const y = H - ((nums[i]-mn)/range)*(H-8) - 4;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle = '#67e8f9';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+/* modal / save behavior (like before) */
+function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
+function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
+function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
+
+function openFeatureModal(featureKey){
+  if(!currentInitData) return alert("No INIT data yet. Send INIT to populate.");
+  const data = currentInitData[featureKey];
+  if(!data) return alert("Feature data missing");
+  editingFeature = featureKey;
+  modalTitle.textContent = ({beep:"Audible beep", standby:"Standby mode", shutdown:"Shutdown mode", hiss:"Audible Hiss band"})[featureKey] || "Edit Feature";
+  // set toggle
+  if(data.enabled) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+
+  // configure slider and labels per feature
+  if(featureKey === 'beep'){
+    modalSlider.min = data.min ?? 0; modalSlider.max = data.max ?? Math.max((data.min||0)+1, data.value||0);
+    modalSlider.step = 1; modalSlider.value = data.value ?? data.def ?? modalSlider.min;
+    sliderLabel.textContent = "Duration - (after every)";
+    sliderMinLabel.textContent = modalSlider.min + " s"; sliderMaxLabel.textContent = modalSlider.max + " s";
+    updateModalSliderValueDisplaySeconds();
+  } else if(featureKey === 'standby' || featureKey === 'shutdown'){
+    const rawMin = data.min_mV ?? 0; const rawMax = data.max_mV ?? Math.max(rawMin+1, data.value_mV||0);
+    modalSlider.min = rawMin; modalSlider.max = rawMax; modalSlider.step = 1;
+    modalSlider.value = data.value_mV ?? data.def_mV ?? modalSlider.min;
+    sliderLabel.textContent = featureKey === 'standby' ? "Standby threshold" : "Shutdown threshold";
+    sliderMinLabel.textContent = (rawMin/1000).toFixed(3) + " V"; sliderMaxLabel.textContent = (rawMax/1000).toFixed(3) + " V";
+    updateModalSliderValueDisplayVolts();
+  } else if(featureKey === 'hiss'){
+    modalSlider.min = data.min_pct ?? 0; modalSlider.max = data.max_pct ?? Math.max((data.min_pct||0)+1, data.value_pct||0);
+    modalSlider.step = 1; modalSlider.value = data.value_pct ?? data.def_pct ?? modalSlider.min;
+    sliderLabel.textContent = "Hiss band %";
+    sliderMinLabel.textContent = modalSlider.min + " %"; sliderMaxLabel.textContent = modalSlider.max + " %";
+    updateModalSliderValueDisplayPercent();
+  }
+  modalBackdrop.style.display = 'flex';
+}
+modalToggle.addEventListener('click', ()=> modalToggle.classList.toggle('on'));
+modalSlider.addEventListener('input', ()=>{
+  if(!editingFeature) return;
+  if(editingFeature === 'beep') updateModalSliderValueDisplaySeconds();
+  else if(editingFeature === 'standby' || editingFeature === 'shutdown') updateModalSliderValueDisplayVolts();
+  else if(editingFeature === 'hiss') updateModalSliderValueDisplayPercent();
+});
+modalReset.addEventListener('click', ()=>{
+  if(!editingFeature || !currentInitData) return;
+  const d = currentInitData[editingFeature];
+  if(!d) return;
+  // restore toggle from en_default
+  if(d.en_default) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+  if(editingFeature === 'beep'){ modalSlider.value = (d.def!=null)?d.def: (d.value!=null?d.value:modalSlider.min); updateModalSliderValueDisplaySeconds(); }
+  else if(editingFeature === 'standby' || editingFeature === 'shutdown'){ modalSlider.value = (d.def_mV!=null)?d.def_mV:(d.value_mV!=null?d.value_mV:modalSlider.min); updateModalSliderValueDisplayVolts(); }
+  else if(editingFeature === 'hiss'){ modalSlider.value = (d.def_pct!=null)?d.def_pct:(d.value_pct!=null?d.value_pct:modalSlider.min); updateModalSliderValueDisplayPercent(); }
+});
+modalClose.addEventListener('click', closeModal);
+modalBackdrop.addEventListener('click', (ev)=>{ if(ev.target === modalBackdrop) closeModal(); });
+function closeModal(){ modalBackdrop.style.display = 'none'; editingFeature = null; }
+
+/* pending ACK wait */
+function waitForInitAck(timeoutMs = 5000){
+  if(pendingSave) throw new Error("pendingSave exists");
+  return new Promise((resolve,reject)=>{
+    const timer = setTimeout(()=>{ if(pendingSave){ pendingSave=null; reject(new Error("timeout")); } else reject(new Error("timeout")); }, timeoutMs);
+    pendingSave = { resolve:(info)=>{ clearTimeout(timer); pendingSave = null; resolve(info); }, reject:(err)=>{ clearTimeout(timer); pendingSave = null; reject(err); } };
+  });
+}
+
+/* build & send save frame, wait for INIT byte10==1 */
+async function performSaveWrite(featureKey, enabledNow, sliderRaw){
+  if(!writeChar) throw new Error("Not connected");
+  if(writeInProgress) throw new Error("Write in progress");
+  const cmd = CMD_BYTES[featureKey];
+  if(!cmd) throw new Error("Unknown feature cmd");
+
+  const frame = new Uint8Array(4 + 2 + 4 + 1 + 2 + 4);
+  let p = 0;
+  frame[p++] = 0xFD; frame[p++] = 0xFC; frame[p++] = 0xFB; frame[p++] = 0xFA;
+  frame[p++] = 0x07; frame[p++] = 0x00;
+  frame[p++] = cmd[0]; frame[p++] = cmd[1]; frame[p++] = cmd[2]; frame[p++] = cmd[3];
+  frame[p++] = enabledNow & 0xFF;
+  frame[p++] = sliderRaw & 0xFF;
+  frame[p++] = (sliderRaw >> 8) & 0xFF;
+  frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
+
+  // attach pending info so onNotify may resolve
+  pendingSave = { feature: featureKey, value: sliderRaw, resolve:null, reject:null };
+  console.log(`TX SAVE [${featureKey}] (EN=${enabledNow}) : ${bytesToHexUpper(frame)}`);
+  try{ await writeFrame(frame, `SAVE-${featureKey}`); }
+  catch(e){ pendingSave=null; throw e; }
+  return waitForInitAck(5000);
+}
+
+modalSave.addEventListener('click', async ()=>{
+  if(!editingFeature || !currentInitData){ closeModal(); return; }
+  if(!writeChar) return alert("Not connected");
+  if(writeInProgress) return alert("Write in progress");
+  const enabledNow = modalToggle.classList.contains('on') ? 1 : 0;
+  const sliderRaw = parseInt(modalSlider.value,10);
+  modalSave.disabled = true; const prevText = modalSave.textContent; modalSave.textContent = "Saving...";
+  try{
+    await performSaveWrite(editingFeature, enabledNow, sliderRaw);
+    // ACK received (onNotify resolved pendingSave). showInit already updated UI.
+    // update local model for consistency
+    if(editingFeature === 'beep'){ currentInitData.beep.enabled = enabledNow===1; currentInitData.beep.value = sliderRaw; }
+    else if(editingFeature === 'standby'){ currentInitData.standby.enabled = enabledNow===1; currentInitData.standby.value_mV = sliderRaw; }
+    else if(editingFeature === 'shutdown'){ currentInitData.shutdown.enabled = enabledNow===1; currentInitData.shutdown.value_mV = sliderRaw; }
+    else if(editingFeature === 'hiss'){ currentInitData.hiss.enabled = enabledNow===1; currentInitData.hiss.value_pct = sliderRaw; }
+    console.log("Save acknowledged; UI updated.");
+    closeModal(); alert("Save acknowledged (INIT byte10=1).");
+  }catch(e){
+    console.warn("Save ACK error:", e);
+    alert("No response received (timeout). Save not acknowledged.");
+    // keep modal open for retry
+  } finally{
+    modalSave.disabled = false; modalSave.textContent = prevText; pendingSave = null;
+  }
+});
+
+/* UI wiring */
+connectButton.addEventListener('click', connect);
+disconnectButton.addEventListener('click', disconnect);
+sendLiveBtn.addEventListener('click', sendLiveCmd);
+sendInitBtn.addEventListener('click', sendInitCmd);
+startAutoBtn.addEventListener('click', startAutoLive);
+stopAutoBtn.addEventListener('click', stopAutoLive);
+clearRaw.addEventListener('click', ()=> recvRaw.innerHTML = '');
+forceParse.addEventListener('click', ()=>{
+  if(!lastPacket) return alert("No packet");
+  if(!isTagAt(lastPacket,6,"LIVE")) return alert("Latest packet not LIVE");
+  const parsed = parseLivePacket(lastPacket);
+  if(parsed.error) alert(parsed.error); else showLive(parsed);
+});
+
+copyParsed.addEventListener('click', async ()=>{
+  const lines = [
+    `Battery (V): ${battery_V.textContent}`,
+    `Average (V): ${avgVoltage.textContent}`,
+    `Min/Max: ${minMax.textContent}`
+  ].join("\n");
+  await navigator.clipboard.writeText(lines); alert("LIVE parsed copied");
+});
+copyInit.addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
+
+/* expose open modal on clicking tiles for demo (map features) */
+document.getElementById('tile_health').addEventListener('click', ()=> openFeatureModal('beep'));
+document.getElementById('tile_minmax').addEventListener('click', ()=> openFeatureModal('standby'));
+document.getElementById('tile_avg').addEventListener('click', ()=> openFeatureModal('shutdown'));
+document.getElementById('tile_current').addEventListener('click', ()=> openFeatureModal('hiss'));
+
+/* simple autosize for canvas */
+function resizeCanvas(){
+  const ratio = window.devicePixelRatio || 1;
+  voltageCanvas.width = voltageCanvas.clientWidth * ratio;
+  voltageCanvas.height = voltageCanvas.clientHeight * ratio;
+  drawChart();
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+/* initial UI state */
+if(!navigator.bluetooth){ alert("Web Bluetooth not available"); connectButton.disabled=true; }
+
+</script>
+</body>
+</html>

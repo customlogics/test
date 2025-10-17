@@ -3,28 +3,21 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>CARCAT 5G — Dashboard (BLE + Waterfall)</title>
+<title>CARCAT 5G — Dashboard (BLE + Serpentine Waterfall)</title>
 <style>
   :root{
-    --bg: #0b0f14;
-    --card: #12202a;
-    --text: #ffffff;
-    --muted: #9fb0c0;
-    --accent-1: #27b56b;
-    --accent-2: #3b82f6;
-    --icon-yellow: #FFD54A;
+    --bg:#071018; --card:#12202a; --text:#fff; --muted:#9fb0c0; --accent-1:#27b56b; --icon-yellow:#FFD54A;
   }
-  html,body{height:100%;margin:0;font-family:Inter, "Segoe UI", Roboto, Arial; background:linear-gradient(180deg,#06070a 0%, #071018 100%); color:var(--text);}
-  .wrap{max-width:1180px;margin:18px auto;padding:18px;display:grid;grid-template-columns:360px 1fr;gap:18px;}
-  .left{display:flex;flex-direction:column;gap:18px;}
-  .hero{background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:18px;border-left:6px solid var(--accent-1);}
-  .hero h1{margin:0;font-size:20px;color:var(--icon-yellow)}
+  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#03060a,#071018);color:var(--text)}
+  .wrap{max-width:1180px;margin:18px auto;padding:18px;display:grid;grid-template-columns:360px 1fr;gap:18px}
+  .left{display:flex;flex-direction:column;gap:18px}
+  .hero{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:12px;padding:18px;border-left:6px solid var(--accent-1)}
   .muted{color:var(--muted);font-size:13px}
   .raw{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;font-family:monospace;color:#bfe9d7;height:130px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
   .btn{padding:8px 12px;border-radius:10px;border:none;background:#2a9df4;color:#021827;cursor:pointer;font-weight:700}
   .ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:8px 10px;border-radius:8px;cursor:pointer}
-  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
-  .tile{background:var(--card); border-radius:12px; padding:16px; position:relative; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.6);}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .tile{background:var(--card);border-radius:12px;padding:16px;position:relative;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
   .heading{font-size:15px;font-weight:800;margin-bottom:8px;color:var(--text);display:flex;align-items:center;justify-content:space-between}
   .metric{display:flex;align-items:center;gap:12px}
   .value{font-size:26px;font-weight:800;color:var(--text)}
@@ -36,18 +29,18 @@
   .wfBlue{background:#2b7bff;padding:8px 12px;border-radius:8px;color:white;font-weight:800}
   .wfGreen{background:#16a34a;padding:8px 12px;border-radius:8px;color:white;font-weight:700}
   .footer{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;margin-top:10px}
-  input[type="range"]{width:140px}
+  input[type=range]{width:140px}
   @media (max-width:980px){.wrap{grid-template-columns:1fr;padding:12px}.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- Left column -->
+    <!-- LEFT -->
     <div class="left">
       <div class="hero">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
-            <h1>CARCAT 5G - Wave</h1>
+            <h1 style="margin:0;color:var(--icon-yellow)">CARCAT 5G - Wave</h1>
             <div class="muted">Car Battery Monitor — BLE telemetry & config</div>
           </div>
           <div style="text-align:right">
@@ -79,16 +72,13 @@
 
       <div class="tile" style="margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:800">Quick</div>
-            <div class="muted">Console TX/RX logs are in browser console</div>
-          </div>
+          <div><div style="font-weight:800">Quick</div><div class="muted">Console TX/RX logs are in browser console</div></div>
           <div><button id="openSetup" class="ghost">Setup</button></div>
         </div>
       </div>
     </div>
 
-    <!-- Right column -->
+    <!-- RIGHT -->
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div style="font-size:18px;font-weight:800">Dashboard</div>
@@ -98,10 +88,7 @@
       <div class="grid">
         <div class="tile" id="card_voltage" style="border-left:6px solid #2dd4bf">
           <div class="heading"><div>Car Battery Voltage</div><div class="muted">LIVE</div></div>
-          <div class="metric">
-            <div class="value" id="card_battery">-- V</div>
-            <div class="muted">instant</div>
-          </div>
+          <div class="metric"><div class="value" id="card_battery">-- V</div><div class="muted">instant</div></div>
           <div class="muted" id="card_battery_sub">From LIVE</div>
         </div>
 
@@ -135,9 +122,9 @@
           <div class="muted">Controls waterfall sweep speed</div>
         </div>
 
-        <!-- Waterfall tile (grid-column full width) -->
+        <!-- Waterfall tile (full width) -->
         <div class="tile" id="card_waterfall" style="grid-column:1/-1;border-left:6px solid #0ea5e9">
-          <div class="heading"><div>Visualization (Waterfall)</div><div class="muted">Radio-style waterfall</div></div>
+          <div class="heading"><div>Visualization (Waterfall)</div><div class="muted">Serpentine waterfall</div></div>
           <div class="wfTopBar">
             <div class="wfBlue" id="wfCurrentFreq">-- kHz</div>
             <div class="wfGreen" id="wfStep">Step: --/--</div>
@@ -146,11 +133,11 @@
             <input id="wfBinsSlider" type="range" min="10" max="100" value="100">
             <div class="badge" id="wfBinsLabel">100</div>
           </div>
-          <canvas id="waterfallCanvas" style="width:100%;height:240px;background:#041028;border-radius:8px;display:block"></canvas>
-          <div style="margin-top:8px" class="muted">Time → upward • Intensity: blue (weak) → red (strong)</div>
+          <canvas id="waterfallCanvas" style="width:100%;height:260px;background:#041028;border-radius:8px;display:block"></canvas>
+          <div style="margin-top:8px" class="muted">Time → upward • Sweep fills row, then pushes up (serpentine)</div>
         </div>
 
-        <!-- Feature cards (unchanged layout) -->
+        <!-- INIT feature cards (kept) -->
         <div class="tile" id="feat_beep_card" style="border-left:6px solid #ff6fa6">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div><div style="font-weight:800">Audible beep</div><div class="muted">Duration (after every)</div></div>
@@ -208,11 +195,10 @@
         </div>
         <div><button id="copyParsed" class="ghost">Copy LIVE</button> <button id="copyInit" class="ghost">Copy INIT</button></div>
       </div>
-
     </div>
   </div>
 
-  <!-- Modal (unchanged minimal) -->
+  <!-- Modal (minimal, unchanged) -->
   <div id="modalBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:2000">
     <div style="width:420px;background:#f6fbff;padding:16px;border-radius:10px;color:#0b1220">
       <div style="text-align:right"><span id="modalClose" style="cursor:pointer">✕</span></div>
@@ -235,22 +221,23 @@
   </div>
 
 <script>
-/* === Full app: BLE + parsing + modal + save ACK + waterfall (updated) === */
+/* Full app (BLE + parsers + modal + save ack + serpentine waterfall) */
 
-/* UUIDs & frames */
+/* UUIDs */
 const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
 const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
 const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
 
+/* CMD templates */
 const LIVE_CMD_HEX = "FD FC FB FA 04 00 4C 49 56 45 04 03 02 01";
 const INIT_CMD_HEX = "FD FC FB FA 04 00 49 4E 49 54 04 03 02 01";
 
-/* CMD bytes */
+/* CMD BYTES mapping */
 const CMD_BYTES = {
-  beep: [0x42,0x45,0x45,0x50],     // "BEEP"
-  standby: [0x53,0x54,0x41,0x4E],  // "STAN"
-  shutdown: [0x53,0x48,0x55,0x54], // "SHUT"
-  hiss: [0x48,0x49,0x53,0x53]      // "HISS"
+  beep: [0x42,0x45,0x45,0x50],
+  standby: [0x53,0x54,0x41,0x4E],
+  shutdown: [0x53,0x48,0x55,0x54],
+  hiss: [0x48,0x49,0x53,0x53]
 };
 
 /* DOM refs */
@@ -268,7 +255,6 @@ const bleText = document.getElementById("bleText");
 const statusDot = document.getElementById("statusDot");
 const autoStatus = document.getElementById("autoStatus");
 
-/* LIVE card elements */
 const card_battery = document.getElementById("card_battery");
 const card_current_val = document.getElementById("card_current_val");
 const card_temp_value = document.getElementById("card_temp_value");
@@ -276,7 +262,6 @@ const card_minfreq_val = document.getElementById("card_minfreq_val");
 const card_maxfreq_val = document.getElementById("card_maxfreq_val");
 const card_waveval = document.getElementById("card_waveval");
 
-/* INIT feature elements */
 const beep_enabled_card = document.getElementById("beep_enabled_card");
 const beep_set = document.getElementById("beep_set");
 const beep_default_card = document.getElementById("beep_default_card");
@@ -307,15 +292,15 @@ const modalSave = document.getElementById('modalSave');
 const modalClose = document.getElementById('modalClose');
 const modalTitle = document.getElementById('modalTitle');
 
-/* waterfall UI refs */
+/* waterfall refs */
+const wfCanvas = document.getElementById('waterfallCanvas');
 const wfCurrentFreq = document.getElementById('wfCurrentFreq');
 const wfStepEl = document.getElementById('wfStep');
 const wfRangeEl = document.getElementById('wfRange');
-const wfCanvas = document.getElementById('waterfallCanvas');
 const wfBinsSlider = document.getElementById('wfBinsSlider');
 const wfBinsLabel = document.getElementById('wfBinsLabel');
 
-/* state */
+/* state variables */
 let device, server, notifyChar, writeChar;
 let lastPacket = null;
 let currentInitData = null;
@@ -325,7 +310,7 @@ let editingFeature = null;
 let pendingSave = null;
 let awaitingInitPromise = null;
 
-/* helper utils */
+/* helpers */
 function hexToBytes(hexStr){
   const cleaned = hexStr.replace(/0x/g,"").replace(/[^A-Fa-f0-9]/g,"");
   const out = new Uint8Array(cleaned.length/2);
@@ -347,7 +332,7 @@ function readU8(buf, idx){ return (idx < buf.length) ? buf[idx] : null; }
 function readU16le(buf, lo, hi){ const l=readU8(buf,lo), h=readU8(buf,hi); if(l===null||h===null) return null; return (h<<8) | l; }
 function isTagAt(buf, offset, tagStr){ if(!buf || buf.length < offset + tagStr.length) return false; for(let i=0;i<tagStr.length;i++) if(buf[offset+i] !== tagStr.charCodeAt(i)) return false; return true; }
 
-/* === LIVE/INIT parsers & UI updates (unchanged logic from previous) === */
+/* PARSERS */
 function parseLivePacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 28) return { error:"LIVE too short" };
@@ -373,12 +358,12 @@ function showLive(obj){
   card_maxfreq_val.textContent = (obj.max_Hz != null) ? (obj.max_Hz/1000).toFixed(3) + " kHz" : "-- kHz";
   card_waveval.textContent = (obj.waveVal != null) ? obj.waveVal.toString() + " ppm" : "-- ppm";
 
-  // update waterfall: this will start the waterfall on first valid LIVE
   const min_khz = (obj.min_Hz != null) ? (obj.min_Hz/1000.0) : 20.0;
   const max_khz = (obj.max_Hz != null) ? (obj.max_Hz/1000.0) : 60.0;
   const ppm = (obj.waveVal != null && obj.waveVal > 0) ? obj.waveVal : 1;
-  if(window.WaterfallChart && typeof window.WaterfallChart.updateFromLive === 'function') {
-    window.WaterfallChart.updateFromLive(min_khz, max_khz, ppm);
+
+  if(window.SerpentineWaterfall && typeof window.SerpentineWaterfall.updateFromLive === 'function'){
+    window.SerpentineWaterfall.updateFromLive(min_khz, max_khz, ppm);
   }
 }
 
@@ -449,7 +434,7 @@ function showInit(obj){
   console.log("INIT parsed & UI updated");
 }
 
-/* write helper */
+/* WRITE helper */
 async function writeFrame(bytes, label){
   if(!writeChar) throw new Error("Not connected");
   console.log("TX " + label + ": " + bytesToHexUpper(bytes));
@@ -460,16 +445,13 @@ async function writeFrame(bytes, label){
 async function sendLiveCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(LIVE_CMD_HEX); await writeFrame(d, "LIVE"); }
 async function sendInitCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(INIT_CMD_HEX); await writeFrame(d, "INIT"); }
 
-/* Connect / disconnect */
-async function connect() {
+/* CONNECT / DISCONNECT */
+async function connect(){
   console.log("Connect button clicked");
-  if (!navigator.bluetooth) {
-    alert("Web Bluetooth is not available in this browser. Use Chrome/Chromium.");
-    return;
-  }
-  try {
-    device = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "CARCAT" }, { name: "CARCAT_5G" }], optionalServices: [serviceUuid] });
-    if (!device) return;
+  if(!navigator.bluetooth){ alert("Web Bluetooth not available"); return; }
+  try{
+    device = await navigator.bluetooth.requestDevice({ filters:[{ namePrefix:"CARCAT" }, { name:"CARCAT_5G" }], optionalServices:[serviceUuid] });
+    if(!device) return;
     device.addEventListener("gattserverdisconnected", onDeviceDisconnected);
     server = await device.gatt.connect();
     const svc = await server.getPrimaryService(serviceUuid);
@@ -482,35 +464,29 @@ async function connect() {
     bleText.textContent = "Connected";
     statusDot.style.background = "#10b981";
 
-    connectButton.disabled = true;
-    disconnectButton.disabled = false;
-    sendLiveBtn.disabled = false;
-    sendInitBtn.disabled = false;
-    startAutoBtn.disabled = false;
-    stopAutoBtn.disabled = true;
-  } catch (err) {
-    console.error("Connect failed:", err);
+    connectButton.disabled = true; disconnectButton.disabled = false;
+    sendLiveBtn.disabled = false; sendInitBtn.disabled = false;
+    startAutoBtn.disabled = false; stopAutoBtn.disabled = true;
+  }catch(err){
+    console.error("Connect failed", err);
     deviceName.textContent = "Not connected";
     bleText.textContent = "Disconnected";
     statusDot.style.background = "#ff6b6b";
     connectButton.disabled = false;
   }
 }
-function onDeviceDisconnected() {
+function onDeviceDisconnected(){
   console.log("Device disconnected");
   deviceName.textContent = "Not connected";
   bleText.textContent = "Disconnected";
   statusDot.style.background = "#ff6b6b";
   connectButton.disabled = false;
   disconnectButton.disabled = true;
-  sendLiveBtn.disabled = true;
-  sendInitBtn.disabled = true;
-  startAutoBtn.disabled = true;
-  stopAutoBtn.disabled = true;
+  sendLiveBtn.disabled = true; sendInitBtn.disabled = true; startAutoBtn.disabled = true; stopAutoBtn.disabled = true;
 }
-async function disconnect() { try{ if(device && device.gatt.connected) device.gatt.disconnect(); }catch(e){console.warn(e);} onDeviceDisconnected(); }
+async function disconnect(){ try{ if(device && device.gatt.connected) device.gatt.disconnect(); }catch(e){console.warn(e);} onDeviceDisconnected(); }
 
-/* Handle notifications */
+/* NOTIFY handler */
 function onNotify(ev){
   const arr = new Uint8Array(ev.target.value.buffer);
 
@@ -524,7 +500,7 @@ function onNotify(ev){
   if (isTagAt(arr, 6, "INIT") && arr.length >= 51) {
     appendRaw(arr, 'INIT');
     const initParsed = parseInitPacket(arr);
-    if (!initParsed.error) {
+    if (!initParsed.error){
       showInit(initParsed);
 
       if (awaitingInitPromise && typeof awaitingInitPromise._resolve === 'function') {
@@ -532,15 +508,15 @@ function onNotify(ev){
         awaitingInitPromise = null;
       }
 
-      // check pending save ack (byte index 10 == 1)
+      // pending save ACK check (byte 10 == 1)
       try {
         const buf = initParsed._rawBuf;
-        if (pendingSave && buf && buf.length > 10 && buf[10] === 1) {
+        if(pendingSave && buf && buf.length > 10 && buf[10] === 1){
           console.log("ACK INIT received (byte10==1) for pending save");
           pendingSave.resolve({ feature: pendingSave.feature, value: pendingSave.value, buf });
           pendingSave = null;
         }
-      } catch (e) { console.warn("ack check error", e); }
+      } catch(e){ console.warn("ack check error", e); }
     }
     return;
   }
@@ -552,41 +528,30 @@ function onNotify(ev){
 function startAutoLive(){
   if(autoIntervalId) return;
   if(!writeChar){ alert("Not connected"); return; }
-  autoStatus.textContent = "Auto ON";
-  startAutoBtn.disabled = true;
-  stopAutoBtn.disabled = false;
+  autoStatus.textContent = "Auto ON"; startAutoBtn.disabled = true; stopAutoBtn.disabled = false;
   autoIntervalId = setInterval(()=>{ if(!writeInProgress) sendLiveCmd(); },500);
 }
-function stopAutoLive(){
-  if(autoIntervalId) clearInterval(autoIntervalId);
-  autoIntervalId = null;
-  autoStatus.textContent = "Idle";
-  startAutoBtn.disabled = false;
-  stopAutoBtn.disabled = true;
-}
+function stopAutoLive(){ if(autoIntervalId) clearInterval(autoIntervalId); autoIntervalId=null; autoStatus.textContent="Idle"; startAutoBtn.disabled=false; stopAutoBtn.disabled=true; }
 
 /* Wait utilities */
-function waitForNextInit(timeoutMs = 3000) {
-  if (awaitingInitPromise) return awaitingInitPromise;
+function waitForNextInit(timeoutMs = 3000){
+  if(awaitingInitPromise) return awaitingInitPromise;
   let timer;
-  awaitingInitPromise = new Promise((resolve, reject) => {
-    timer = setTimeout(() => { awaitingInitPromise = null; reject(new Error("INIT timeout")); }, timeoutMs);
-    awaitingInitPromise._resolve = (initParsed) => { clearTimeout(timer); awaitingInitPromise = null; resolve(initParsed); };
+  awaitingInitPromise = new Promise((resolve,reject)=>{
+    timer = setTimeout(()=>{ awaitingInitPromise=null; reject(new Error("INIT timeout")); }, timeoutMs);
+    awaitingInitPromise._resolve = (initParsed)=>{ clearTimeout(timer); awaitingInitPromise = null; resolve(initParsed); };
   });
   return awaitingInitPromise;
 }
 function waitForInitAck(feature, value, timeoutMs = 5000){
   if(pendingSave) throw new Error("pendingSave already exists");
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { if (pendingSave) pendingSave = null; reject(new Error("timeout")); }, timeoutMs);
-    pendingSave = { feature, value,
-      resolve: (info) => { clearTimeout(timer); pendingSave = null; resolve(info); },
-      reject: (err) => { clearTimeout(timer); pendingSave = null; reject(err); }
-    };
+  return new Promise((resolve,reject)=>{
+    const timer = setTimeout(()=>{ if(pendingSave) pendingSave=null; reject(new Error("timeout")); }, timeoutMs);
+    pendingSave = { feature, value, resolve:(info)=>{ clearTimeout(timer); pendingSave=null; resolve(info); }, reject:(err)=>{ clearTimeout(timer); pendingSave=null; reject(err); } };
   });
 }
 
-/* build & send save frame */
+/* SAVE write */
 async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   if(!writeChar) throw new Error("Not connected");
   if(writeInProgress) throw new Error("Write in progress");
@@ -594,14 +559,14 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   if(!cmd) throw new Error("Unknown feature cmd");
 
   const frame = new Uint8Array(4 + 2 + 4 + 1 + 2 + 4);
-  let p = 0;
-  frame[p++] = 0xFD; frame[p++] = 0xFC; frame[p++] = 0xFB; frame[p++] = 0xFA;
-  frame[p++] = 0x07; frame[p++] = 0x00;
-  frame[p++] = cmd[0]; frame[p++] = cmd[1]; frame[p++] = cmd[2]; frame[p++] = cmd[3];
-  frame[p++] = enabledNow & 0xFF;
-  frame[p++] = sliderRaw & 0xFF;
-  frame[p++] = (sliderRaw >> 8) & 0xFF;
-  frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
+  let p=0;
+  frame[p++]=0xFD; frame[p++]=0xFC; frame[p++]=0xFB; frame[p++]=0xFA;
+  frame[p++]=0x07; frame[p++]=0x00;
+  frame[p++]=cmd[0]; frame[p++]=cmd[1]; frame[p++]=cmd[2]; frame[p++]=cmd[3];
+  frame[p++]=enabledNow & 0xFF;
+  frame[p++]=sliderRaw & 0xFF;
+  frame[p++]=(sliderRaw>>8)&0xFF;
+  frame[p++]=0x04; frame[p++]=0x03; frame[p++]=0x02; frame[p++]=0x01;
 
   console.log(`TX SAVE [${featureKey}] (EN=${enabledNow}) : ${bytesToHexUpper(frame)}`);
   await writeFrame(frame, `SAVE-${featureKey}`);
@@ -609,7 +574,7 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   return waitForInitAck(featureKey, sliderRaw, 5000);
 }
 
-/* modal logic (unchanged) */
+/* Modal logic (unchanged) */
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
@@ -625,18 +590,18 @@ function openFeatureModal(featureKey){
   if(featureKey === 'beep'){
     modalSlider.min = data.min ?? 0; modalSlider.max = data.max ?? Math.max((data.min||0)+1, data.value||0);
     modalSlider.step = 1; modalSlider.value = data.value ?? data.def ?? modalSlider.min;
-    sliderLabel.textContent = "Duration - (after every)";
+    sliderLabel = document.getElementById('sliderLabel'); if(sliderLabel) sliderLabel.textContent = "Duration - (after every)";
     updateModalSliderValueDisplaySeconds();
   } else if(featureKey === 'standby' || featureKey === 'shutdown'){
     const rawMin = data.min_mV ?? 0; const rawMax = data.max_mV ?? Math.max(rawMin+1, data.value_mV||0);
     modalSlider.min = rawMin; modalSlider.max = rawMax; modalSlider.step = 1;
     modalSlider.value = data.value_mV ?? data.def_mV ?? modalSlider.min;
-    sliderLabel.textContent = featureKey === 'standby' ? "Charging voltage threshold" : "Cut-off voltage";
+    sliderLabel = document.getElementById('sliderLabel'); if(sliderLabel) sliderLabel.textContent = featureKey === 'standby' ? "Charging voltage threshold" : "Cut-off voltage";
     updateModalSliderValueDisplayVolts();
   } else if(featureKey === 'hiss'){
     modalSlider.min = data.min_pct ?? 0; modalSlider.max = data.max_pct ?? Math.max((data.min_pct||0)+1, data.value_pct||0);
     modalSlider.step = 1; modalSlider.value = data.value_pct ?? data.def_pct ?? modalSlider.min;
-    sliderLabel.textContent = "Play frequency (band %)";
+    sliderLabel = document.getElementById('sliderLabel'); if(sliderLabel) sliderLabel.textContent = "Play frequency (band %)";
     updateModalSliderValueDisplayPercent();
   }
   modalBackdrop.style.display = 'flex';
@@ -654,8 +619,7 @@ modalSlider.addEventListener('input', ()=>{
 });
 modalReset.addEventListener('click', ()=>{
   if(!editingFeature || !currentInitData) return;
-  const d = currentInitData[editingFeature];
-  if(!d) return;
+  const d = currentInitData[editingFeature]; if(!d) return;
   if(d.en_default) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
   if(editingFeature === 'beep'){ modalSlider.value = (d.def!=null)?d.def:(d.value!=null?d.value:modalSlider.min); updateModalSliderValueDisplaySeconds(); }
   else if(editingFeature === 'standby' || editingFeature === 'shutdown'){ modalSlider.value = (d.def_mV!=null)?d.def_mV:(d.value_mV!=null?d.value_mV:modalSlider.min); updateModalSliderValueDisplayVolts(); }
@@ -689,24 +653,18 @@ modalSave.addEventListener('click', async ()=>{
   }
 });
 
-/* gear wiring */
-document.querySelectorAll('.gear').forEach(g => {
-  g.addEventListener('click', async () => {
+/* Gear wiring */
+document.querySelectorAll('.gear').forEach(g=>{
+  g.addEventListener('click', async ()=>{
     const feature = g.dataset.feature;
-    if (currentInitData) { openFeatureModal(feature); return; }
-    if (!writeChar) { alert("Not connected. Please connect before editing features."); return; }
-    try {
-      await sendInitCmd();
-      const initParsed = await waitForNextInit(3000);
-      openFeatureModal(feature);
-    } catch (err) {
-      console.warn("Failed to get INIT before opening modal:", err);
-      alert("Could not get INIT from device. Try sending INIT manually and try again.");
-    }
+    if(currentInitData){ openFeatureModal(feature); return; }
+    if(!writeChar){ alert("Not connected. Please connect before editing features."); return; }
+    try{ await sendInitCmd(); const initParsed = await waitForNextInit(3000); openFeatureModal(feature); }
+    catch(err){ console.warn("Failed to get INIT:", err); alert("Could not get INIT from device. Try sending INIT manually and try again."); }
   });
 });
 
-/* UI wiring for other controls */
+/* UI wiring other */
 connectButton.addEventListener('click', connect);
 disconnectButton.addEventListener('click', disconnect);
 sendLiveBtn.addEventListener('click', sendLiveCmd);
@@ -716,8 +674,8 @@ stopAutoBtn.addEventListener('click', stopAutoLive);
 clearRaw.addEventListener('click', ()=> recvRaw.innerHTML = '');
 forceParse.addEventListener('click', ()=>{
   if(!lastPacket) return alert("No packet available");
-  if(!isTagAt(lastPacket, 6, "LIVE")) return alert("Latest packet does not have 'LIVE' at bytes 6..9 — parsing skipped.");
-  if(lastPacket.length < 28) return alert("LIVE packet too short (need ≥28 bytes).");
+  if(!isTagAt(lastPacket,6,"LIVE")) return alert("Latest packet is not LIVE");
+  if(lastPacket.length < 28) return alert("LIVE packet too short");
   const parsed = parseLivePacket(lastPacket);
   if(parsed.error) alert(parsed.error); else showLive(parsed);
 });
@@ -733,53 +691,56 @@ document.getElementById('copyParsed').addEventListener('click', async ()=>{
 });
 document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
-/* ============================
-   WaterfallChart v2 (improved)
-   - starts only after updateFromLive called first time
-   - scrolls upward (time flows up) by copying canvas content up
-   - adjustable bins via slider (10..100)
-   - gaussian peak + noise, HSL color ramp
-   - robust handling of resizing and bins changes
-   ============================ */
-(function WaterfallModule(){
+/* ===============================================================
+   Serpentine Waterfall implementation (corrected behavior)
+   - Each sweep fills a bottom row (bins steps L->R or R->L).
+   - At end-of-sweep, the filled row is pushed upwards and direction reversed.
+   - Timing still obeys ppm: #cycles per minute. One cycle = min->max->min.
+   - stepMs = (60s/ppm) / (2*bins) * 1000
+   - Starts only when updateFromLive called with valid params.
+   =============================================================== */
+(function SerpentineWaterfall(){
   const canvas = wfCanvas;
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = canvas.getContext('2d', { alpha:false });
   const dpr = window.devicePixelRatio || 1;
 
+  // default params
   let bins = parseInt(wfBinsSlider.value,10) || 100;
-  let min_khz = 20.0, max_khz = 60.0, ppm = 10;
-  const ROW_H = 1;               // row height in CSS pixels
+  let min_khz = 20.0, max_khz = 60.0, ppm = 1;
+  const ROW_H = 1;             // 1px row height
   const SIGMA = 2.2;
-  const NOISE_LEVEL = 18;
+  const NOISE = 18;
   const MIN_STEP_MS = 4;
   const MAX_STEP_MS = 2000;
 
-  let widthCss = 800, heightCss = 240;
+  // dynamic state
+  let widthCss = 800, heightCss = 260;
   let binWidth = 1;
   let binFreqsHz = new Float32Array(bins);
-  let started = false;           // don't animate until first updateFromLive
-  let stepMs = 150;
+
+  // sweep buffer: build a full row across bins during sweep, then push
+  let currentRow = new Uint8ClampedArray(bins);
+  let currentIndex = 0;
+  let direction = 1; // 1 => left->right, -1 => right->left
+  let started = false;
+  let stepMs = 120;
   let lastTime = performance.now();
   let acc = 0;
   let stepCounter = 0;
 
   function resizeCanvas(){
-    const cssW = Math.floor(canvas.clientWidth) || 600;
-    const cssH = Math.floor(canvas.clientHeight) || 240;
+    const cssW = Math.max(240, Math.floor(canvas.clientWidth));
+    const cssH = Math.max(80, Math.floor(canvas.clientHeight));
     widthCss = cssW; heightCss = cssH;
     canvas.width = cssW * dpr;
     canvas.height = cssH * dpr;
     ctx.setTransform(dpr,0,0,dpr,0,0);
     binWidth = widthCss / bins;
-    // clear background
+    // clear
     ctx.fillStyle = "#031025";
     ctx.fillRect(0,0,widthCss,heightCss);
   }
-  window.addEventListener('resize', ()=> {
-    resizeCanvas();
-    // redraw clean slate
-  });
-  resizeCanvas();
+  window.addEventListener('resize', ()=> { resizeCanvas(); clearSweep(); });
 
   function computeBinFreqs(){
     const minHz = min_khz * 1000.0;
@@ -787,63 +748,58 @@ document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!cu
     binFreqsHz = new Float32Array(bins);
     for(let i=0;i<bins;i++){
       const t = i/(bins-1);
-      binFreqsHz[i] = minHz + t*(maxHz - minHz);
+      binFreqsHz[i] = minHz + t*(maxHz-minHz);
     }
   }
-  computeBinFreqs();
+
+  function resetSweepState(){
+    currentRow = new Uint8ClampedArray(bins);
+    direction = 1;
+    currentIndex = (direction===1) ? 0 : (bins-1);
+    stepCounter = 0;
+    acc = 0;
+  }
+
+  function clearSweep(){
+    ctx.fillStyle = "#031025";
+    ctx.fillRect(0,0,widthCss,heightCss);
+    resetSweepState();
+  }
 
   function ppmToMs(ppmVal){
-    const forward = bins - 1;
-    const stepsPerCycle = 2 * forward;
-    const periodSeconds = 60.0 / Math.max(1e-6, ppmVal);
-    let ms = (periodSeconds / stepsPerCycle) * 1000.0;
+    const stepsPerCycle = 2 * bins; // min->max (bins steps) + max->min (bins steps)
+    const periodSec = 60.0 / Math.max(1e-6, ppmVal);
+    let ms = (periodSec / stepsPerCycle) * 1000.0;
     ms = Math.max(MIN_STEP_MS, Math.min(MAX_STEP_MS, Math.round(ms)));
     return ms;
   }
 
-  function activeBinForStep(st){
-    const forward = bins - 1;
-    const steps = 2 * forward;
-    const s = st % steps;
-    if(s <= forward) return s;
-    return steps - s;
-  }
-
-  function makeRow(activeBin){
-    const row = new Uint8ClampedArray(bins);
+  function intensityForBin(binIdx, activeIdx){
     const denom = 2 * SIGMA * SIGMA;
-    for(let b=0;b<bins;b++){
-      const d = b - activeBin;
-      const g = Math.exp(-(d*d)/denom);
-      let val = Math.round(240 * g + (Math.random() * NOISE_LEVEL));
-      if(val < 6) val = 0;
-      row[b] = Math.min(255, val);
-    }
-    return row;
+    const d = binIdx - activeIdx;
+    const g = Math.exp(-(d*d)/denom);
+    let val = Math.round(240 * g + (Math.random()*NOISE));
+    if(val < 6) val = 0;
+    return Math.min(255, val);
   }
 
   function colorForIntensity(t){
-    // t in [0..1], map to a pleasing blue->cyan->green->yellow->red
-    const hue = 220 - (220 * t); // 220 (blue) -> 0 (red approx)
+    // t 0..1 map to blue->cyan->green->yellow->red
+    const hue = 220 - (220 * t); // 220 blue -> 0 red
     const sat = 95;
-    const light = Math.round(18 + 30 * t);
+    const light = Math.round(18 + 30*t);
     return `hsl(${Math.round(hue)}, ${sat}%, ${light}%)`;
   }
 
-  // scroll up using drawImage (fast) and draw new row at bottom
-  function pushRow(row){
+  // push a filled row upwards (draw full row at bottom and scroll previous up)
+  function pushFilledRow(rowArray){
     const w = widthCss, h = heightCss;
-    // scroll up by ROW_H pixels
-    // drawImage uses source and destination in CSS px because of transform set earlier
-    ctx.drawImage(canvas, 0, ROW_H, w, h - ROW_H, 0, 0, w, h - ROW_H);
-    // clear bottom line
-    ctx.fillStyle = "#031025";
-    ctx.fillRect(0, h - ROW_H, w, ROW_H);
-
-    // draw row at bottom y = h-ROW_H
+    // scroll up by ROW_H
+    ctx.drawImage(canvas, 0, ROW_H, w, h-ROW_H, 0, 0, w, h-ROW_H);
+    // draw row at bottom
     const y = h - ROW_H;
     for(let b=0;b<bins;b++){
-      const intensity = row[b];
+      const intensity = rowArray[b];
       if(intensity <= 0) continue;
       const t = intensity / 255.0;
       ctx.fillStyle = colorForIntensity(t);
@@ -852,83 +808,150 @@ document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!cu
     }
   }
 
-  function drawOverlay(activeBin){
-    const freqHz = Math.round(binFreqsHz[activeBin] || 0);
-    const freqk = (freqHz / 1000).toFixed(2);
+  // option: draw moving cursor at bottom while building row (small indicator)
+  function drawCursorAt(index){
+    // redraw bottom line background for cursor (so we see cursor while building)
+    const w = widthCss, h = heightCss;
+    const y = h - ROW_H;
+    // draw single pixel under index to visualize moving cursor (overwrites previous)
+    const x = Math.floor(index * binWidth);
+    ctx.fillStyle = "#01111a";
+    ctx.fillRect(x, y, Math.ceil(binWidth), ROW_H);
+    // draw cursor color
+    const t = 1.0; // bright
+    ctx.fillStyle = "hsl(20, 95%, 60%)";
+    ctx.fillRect(x, y, Math.ceil(binWidth), ROW_H);
+  }
+
+  function drawOverlay(active){
+    const freqHz = Math.round(binFreqsHz[active] || 0);
+    const freqk = (freqHz/1000).toFixed(2);
     wfCurrentFreq.textContent = `${freqk} kHz`;
-    wfStepEl.textContent = `Step: ${activeBin+1}/${bins}`;
+    // Show step as position within row (1..bins) and stepCounter cycles maybe
+    wfStepEl.textContent = `Step: ${Math.min(active+1,bins)}/${bins}`;
     wfRangeEl.textContent = `Range: ${min_khz.toFixed(2)}–${max_khz.toFixed(2)} kHz`;
     wfBinsLabel.textContent = String(bins);
   }
 
+  // main loop: each 'step' fills one bin in currentRow; when row completes we push it
   function loop(now){
     if(!started) { requestAnimationFrame(loop); return; }
-    const dt = now - lastTime;
-    lastTime = now;
+    const dt = now - lastTime; lastTime = now;
     acc += dt;
     while(acc >= stepMs){
-      const active = activeBinForStep(stepCounter);
-      const row = makeRow(active);
-      pushRow(row);
-      drawOverlay(active);
-      stepCounter = (stepCounter + 1) % (2*(bins - 1));
+      // fill currentIndex in currentRow
+      const activeIdx = currentIndex;
+      currentRow[activeIdx] = intensityForBin(activeIdx, activeIdx);
+      // draw a temporary cursor so user sees movement while filling row
+      // We clear only bottom pixel area before drawing cursor for clarity
+      // To avoid ghosting we redraw bottom background then currentRow so cursor visible:
+      const bottomY = heightCss - ROW_H;
+      ctx.fillStyle = "#031025";
+      ctx.fillRect(0, bottomY, widthCss, ROW_H);
+      // draw all filled bins so far (so bottom shows progressive fill)
+      for(let b=0;b<bins;b++){
+        const val = currentRow[b];
+        if(val <= 0) continue;
+        ctx.fillStyle = colorForIntensity(val/255);
+        const x = Math.floor(b*binWidth);
+        ctx.fillRect(x, bottomY, Math.ceil(binWidth), ROW_H);
+      }
+      // show cursor highlight at activeIdx
+      drawCursorAt(activeIdx);
+
+      // advance index by direction
+      currentIndex += direction;
+      stepCounter++;
+      // check end-of-sweep: if index moved beyond (either <0 or >=bins)
+      if(currentIndex < 0 || currentIndex >= bins){
+        // Completed one sweep: push the filled row upward
+        pushFilledRow(currentRow);
+        // prepare next row: reverse direction and reset currentRow
+        direction = -direction;
+        currentRow = new Uint8ClampedArray(bins);
+        // set currentIndex to start for next sweep
+        currentIndex = (direction === 1) ? 0 : (bins-1);
+        // (do not increment stepCounter extra; continuing)
+        // increment stepCounter already done.
+      }
+
+      // update overlay with active bin (use safe range)
+      const overlayActive = Math.max(0, Math.min(bins-1, Math.floor((currentIndex - direction))));
+      drawOverlay(overlayActive);
+
       acc -= stepMs;
     }
     requestAnimationFrame(loop);
   }
 
-  // Public API
+  // public API
   function updateFromLive(minK, maxK, ppmVal){
-    // update parameters and start waterfall (if not started)
+    // update params
     min_khz = minK || min_khz;
     max_khz = maxK || max_khz;
     ppm = (ppmVal && ppmVal > 0) ? ppmVal : ppm;
     computeBinFreqs();
+    // compute stepMs for serpentine: full cycle has 2*bins steps
     stepMs = ppmToMs(ppm);
-    // ensure canvas resized to current bins mapping
+    // ensure canvas sized
+    resizeCanvas();
+    // recompute binWidth
     binWidth = widthCss / bins;
+    // start if not started
     if(!started){
       started = true;
+      resetSweepState();
       lastTime = performance.now();
       acc = 0;
       requestAnimationFrame(loop);
     }
+    console.log(`Waterfall started/updated: min=${min_khz}kHz max=${max_khz}kHz ppm=${ppm} stepMs=${stepMs} bins=${bins}`);
+  }
+
+  function ppmToMs(ppmVal){
+    const stepsPerCycle = 2 * bins; // min->max + max->min
+    const periodSec = 60.0 / Math.max(1e-6, ppmVal);
+    let ms = (periodSec / stepsPerCycle) * 1000.0;
+    ms = Math.max(MIN_STEP_MS, Math.min(MAX_STEP_MS, Math.round(ms)));
+    return ms;
   }
 
   function setBins(n){
     n = Math.max(10, Math.min(100, Math.round(n)));
     if(n === bins) return;
-    // preserve some stepCounter fraction to avoid jump
     bins = n;
+    // recompute arrays and clear canvas to avoid artifacts
     computeBinFreqs();
     binWidth = widthCss / bins;
-    // clear canvas so new resolution draws cleanly
+    currentRow = new Uint8ClampedArray(bins);
+    // reset sweep and clear canvas
     ctx.fillStyle = "#031025";
     ctx.fillRect(0,0,widthCss,heightCss);
-    stepCounter = 0;
-    acc = 0;
+    direction = 1; currentIndex = 0; stepCounter = 0; acc = 0;
+    // recompute stepMs according to new bins and current ppm
+    stepMs = ppmToMs(ppm);
   }
 
-  // expose
-  window.WaterfallChart = {
+  // wire bins slider
+  wfBinsSlider.addEventListener('input', ()=> {
+    const val = parseInt(wfBinsSlider.value,10);
+    wfBinsLabel.textContent = String(val);
+    setBins(val);
+  });
+
+  // expose API
+  window.SerpentineWaterfall = {
     updateFromLive,
     setBins
   };
 
-  // initialize and prepare loop (not started until updateFromLive called)
+  // initial resize
   resizeCanvas();
+  computeBinFreqs();
+  resetSweepState();
   lastTime = performance.now();
   requestAnimationFrame(loop);
-
-  // wire bins slider
-  wfBinsSlider.addEventListener('input', ()=> {
-    const n = parseInt(wfBinsSlider.value,10);
-    wfBinsLabel.textContent = String(n);
-    try { window.WaterfallChart.setBins(n); }
-    catch(e){ console.warn(e); }
-  });
-
-})();
+})(); // end waterfall module
 
 /* initial checks */
 if(!navigator.bluetooth){
@@ -938,8 +961,6 @@ if(!navigator.bluetooth){
   sendInitBtn.disabled = true;
   stopAutoBtn.disabled = true;
 }
-
-/* End of file */
 </script>
 </body>
 </html>

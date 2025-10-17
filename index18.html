@@ -191,7 +191,7 @@
             Wave velocity (current)
           </div>
           <div class="feature-value" id="card_waveval">--</div>
-          <div class="sub">From LIVE packet (controls waterfall speed)</div>
+          <div class="sub">From LIVE packet (ppm — controls waterfall speed)</div>
         </div>
 
         <div class="tile" id="card_pattern" style="border-left:6px solid var(--accent-2)">
@@ -225,8 +225,8 @@
             </svg>
             Visualization (Waterfall)
           </div>
-          <div class="sub">100 frequency bins between Min & Max. Moving point animates min → max → min.</div>
-          <canvas id="waterfallCanvas" width="500" height="150" style="width:100%;height:140px;border-radius:8px;background:#0b1220;margin-top:12px;display:block"></canvas>
+          <div class="sub">100 frequency bins between Min & Max. Sweep repeats based on wave velocity (ppm).</div>
+          <canvas id="waterfallCanvas" width="700" height="150" style="width:100%;height:140px;border-radius:8px;background:#04121a;margin-top:12px;display:block"></canvas>
           <div style="margin-top:8px; display:flex; gap:12px; align-items:center">
             <div class="small-muted">Display:</div>
             <div class="badge" id="wfInfo">--</div>
@@ -411,8 +411,10 @@
   </div>
 
 <script>
-/* All original BLE & UI behavior preserved.
-   Waterfall added below — it uses current min/max freq and wave velocity to animate. */
+/* ============================
+   BLE + UI + parsing (unchanged)
+   Waterfall updated to true sweep driven by waveVal (ppm)
+   ============================ */
 
 /* UUIDs & frames */
 const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
@@ -511,14 +513,14 @@ let awaitingInitPromise = null;
 
 /* Waterfall state */
 const WF_BINS = 100;          // 100 data points between min & max
-const WF_ROWS = 120;          // number of rows in waterfall (history)
-let wfBuffer = [];            // array of rows (each row = Uint8Array length WF_BINS, intensity 0..255)
-let wfBinValues = new Float32Array(WF_BINS); // the nominal bin frequencies in Hz (for label only)
-let wfPlayIndex = 0;          // moving bin index
-let wfDirection = 1;         // 1 -> forward, -1 -> backward
-let wfIntervalMs = 200;      // interval between moving steps (derived from wave velocity)
-let wfAnimTimer = null;      // timer id for motion
-let wfLastWaveVal = 0;       // last observed waveVal
+const WF_ROWS = 160;          // history rows (visual depth)
+let wfBuffer = [];            // array of rows (each row = Uint8Array length WF_BINS)
+let wfBinValues = new Float32Array(WF_BINS); // nominal bin freqs (Hz)
+let wfStep = 0;               // current step in cycle
+let wfDirection = 1;          // derived from step math, not used directly now
+let wfTimer = null;          // interval id
+let wfLastPpm = 1;          // last observed ppm (waveVal)
+const SIGMA = 3.0;          // gaussian spread (bins) around active bin
 
 /* helpers */
 function hexToBytes(hexStr){
@@ -550,12 +552,12 @@ function parseLivePacket(bytes){
     battery_mV: readU16le(buf,10,11),
     current_mA: (() => {
       const raw = readU16le(buf,12,13);
-      return (raw != null) ? (raw/1000) : null; // displayed as mA per earlier convention
+      return (raw != null) ? (raw/1000) : null;
     })(),
     temp_raw: readU16le(buf,14,15),
     min_Hz: readU16le(buf,16,17),
     max_Hz: readU16le(buf,18,19),
-    waveVal: readU16le(buf,20,21),
+    waveVal: readU16le(buf,20,21),  // interpreted as ppm
     pattern: readU8(buf,22),
     days: readU16le(buf,23,24),
     hh: readU8(buf,25), mm: readU8(buf,26), ss: readU8(buf,27),
@@ -578,11 +580,11 @@ function showLive(obj){
   card_days.textContent = (obj.days != null) ? obj.days.toString() + " Days" : "-- Days";
   card_hhmmss.textContent = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "--:--:--";
 
-  // update waterfall parameters so the visualization follows live packet
+  // update waterfall (min/max/ppm)
   updateWaterfallParamsFromLive(obj);
 }
 
-/* INIT parsing & display */
+/* INIT parsing & display (unchanged) */
 function parseInitPacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 51) return { error:"INIT too short" };
@@ -830,7 +832,7 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   return waitForInitAck(featureKey, sliderRaw, 5000);
 }
 
-/* modal helpers */
+/* modal helpers (unchanged) */
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
@@ -885,7 +887,7 @@ modalClose.addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', (ev)=>{ if(ev.target === modalBackdrop) closeModal(); });
 function closeModal(){ modalBackdrop.style.display = 'none'; editingFeature = null; }
 
-/* modal save uses performSaveWrite (which waits for ACK) */
+/* modal save (unchanged) */
 modalSave.addEventListener('click', async ()=>{
   if(!editingFeature || !currentInitData){ closeModal(); return; }
   if(!writeChar) { alert("Not connected — can't send save command"); return; }
@@ -912,7 +914,7 @@ modalSave.addEventListener('click', async ()=>{
   }
 });
 
-/* gear button wiring */
+/* gear button wiring (unchanged) */
 document.querySelectorAll('.gear').forEach(g => {
   g.addEventListener('click', async () => {
     const feature = g.dataset.feature;
@@ -929,7 +931,7 @@ document.querySelectorAll('.gear').forEach(g => {
   });
 });
 
-/* UI wiring for other controls */
+/* UI wiring for other controls (unchanged) */
 connectButton.addEventListener('click', connect);
 disconnectButton.addEventListener('click', disconnect);
 sendLiveBtn.addEventListener('click', sendLiveCmd);
@@ -957,28 +959,24 @@ document.getElementById('copyParsed').addEventListener('click', async ()=>{
 document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
 /* =========================
-   Waterfall: init, update, animation
-   - Builds WF_BINS frequencies between min and max (Hz)
-   - Each step moves the active index forward/backward across bins.
-   - wave velocity -> controls interval (faster when waveVal higher)
-   - Draws rows of history; active bin drawn bright; older rows fade
+   Waterfall implementation (improved)
+   - 100 bins between min & max
+   - gaussian spread per row
+   - active index sweeps min->max->min
+   - speed governed by waveVal (ppm)
    ========================= */
 
-function initWaterfall(){
-  // fill empty buffer
+function initWFBuffers(){
   wfBuffer = [];
-  for(let r=0;r<WF_ROWS;r++){
-    wfBuffer.push(new Uint8Array(WF_BINS)); // all zeros
-  }
-  wfPlayIndex = 0;
-  wfDirection = 1;
-  wfIntervalMs = 200;
-  wfLastWaveVal = 0;
-  drawWaterfall(); // draw initial empty
+  for(let r=0;r<WF_ROWS;r++) wfBuffer.push(new Uint8Array(WF_BINS));
+  wfStep = 0;
+  wfLastPpm = 1;
+  computeBinFreqs(1.0, 20.0); // defaults
   wfInfo.textContent = `bins:${WF_BINS}`;
+  drawWaterfall(); // initial
 }
 
-/* generate nominal bin frequencies (Hz) given min_kHz & max_kHz numeric */
+/* compute bin nominal freqs (Hz) */
 function computeBinFreqs(min_khz, max_khz){
   const minHz = min_khz * 1000;
   const maxHz = max_khz * 1000;
@@ -988,7 +986,7 @@ function computeBinFreqs(min_khz, max_khz){
   }
 }
 
-/* convert displayed "17.400 kHz" into numeric kHz (float) */
+/* parse displayed kHz like "17.4 kHz" -> numeric value in kHz */
 function parseDisplayedKHz(str){
   if(!str) return null;
   const m = str.match(/([0-9.+-eE]+)/);
@@ -996,95 +994,129 @@ function parseDisplayedKHz(str){
   return parseFloat(m[1]);
 }
 
-/* update waterfall parameters from live packet parsed object */
+/* update waterfall params when LIVE arrives */
 function updateWaterfallParamsFromLive(liveObj){
-  // parse displayed card text to extract numbers (so it follows exactly what's shown)
   const min_khz = parseDisplayedKHz(card_minfreq.textContent) || 1.0;
   const max_khz = parseDisplayedKHz(card_maxfreq.textContent) || 20.0;
-  const waveVal = (liveObj.waveVal != null) ? liveObj.waveVal : wfLastWaveVal || 120;
+  const ppm = (liveObj.waveVal != null && liveObj.waveVal > 0) ? liveObj.waveVal : (wfLastPpm || 1);
 
-  // compute bins
   computeBinFreqs(min_khz, max_khz);
-  // compute interval from waveVal (higher waveVal => faster). Map waveVal to ms:
-  // We use a linear mapping: waveVal 0 => 800ms, waveVal 200 => 60ms; clamp
-  const mapped = Math.round(800 - (waveVal * 3.7)); // 200*3.7 ~ 740 -> 60
-  wfIntervalMs = Math.max(40, Math.min(1000, mapped));
-  wfLastWaveVal = waveVal;
-  wfInfo.textContent = `bins:${WF_BINS} ${min_khz.toFixed(2)}–${max_khz.toFixed(2)} kHz | speed:${wfIntervalMs}ms`;
+  wfLastPpm = ppm;
+  // compute step timing precisely:
+  // forwardSteps = WF_BINS - 1
+  // stepsPerCycle = 2 * forwardSteps  (min->max->min)
+  const forwardSteps = WF_BINS - 1;
+  const stepsPerCycle = 2 * forwardSteps;
+  const periodSeconds = 60.0 / Math.max(0.0001, ppm); // seconds per full cycle
+  let stepIntervalMs = (periodSeconds / stepsPerCycle) * 1000.0;
+  // clamp to sensible range
+  stepIntervalMs = Math.max(6, Math.min(2000, Math.round(stepIntervalMs)));
 
-  // ensure animation uses updated interval
-  restartWaterfallTimer();
+  wfInfo.textContent = `bins:${WF_BINS} ${min_khz.toFixed(2)}–${max_khz.toFixed(2)} kHz | ppm:${ppm} | step:${stepIntervalMs}ms`;
+
+  restartWFTimer(stepIntervalMs);
 }
 
-/* push a row representing the current active bin index */
-function pushWaterfallRow(activeIndex){
-  // create empty row
+/* create a gaussian row centered at activeBin */
+function makeRowForBin(activeBin){
   const row = new Uint8Array(WF_BINS);
-  // set intensity at activeIndex
-  const idx = Math.max(0, Math.min(WF_BINS-1, activeIndex));
-  row[idx] = 255; // peak intensity
-  // shift buffer
+  for(let b=0;b<WF_BINS;b++){
+    const d = Math.abs(b - activeBin);
+    // gaussian falloff
+    const intensity = Math.exp( - (d * d) / (2 * SIGMA * SIGMA) );
+    let val = Math.round(255 * intensity);
+    // add tiny noise
+    val = Math.min(255, val + Math.round(Math.random()*12));
+    if(val < 6) val = 0;
+    row[b] = val;
+  }
+  return row;
+}
+
+/* push new row (scrolled at bottom) */
+function pushRow(row){
   wfBuffer.push(row);
   if(wfBuffer.length > WF_ROWS) wfBuffer.shift();
 }
 
-/* draw the waterfall buffer to canvas */
+/* draw the waterfall */
 function drawWaterfall(){
-  const cw = waterfallCanvas.width;
-  const ch = waterfallCanvas.height;
-  // clear (fill dark)
+  const canvas = waterfallCanvas;
+  const cw = canvas.width;
+  const ch = canvas.height;
+  wfCtx.clearRect(0,0,cw,ch);
+  // fill background
   wfCtx.fillStyle = "#04121a";
   wfCtx.fillRect(0,0,cw,ch);
 
-  // each row corresponds to one buffer element. we'll draw from top (oldest) to bottom (newest)
   const rowHeight = ch / WF_ROWS;
   const binWidth = cw / WF_BINS;
 
+  // draw from oldest (top) to newest (bottom)
   for(let r=0;r<wfBuffer.length;r++){
     const row = wfBuffer[r];
     const y = r * rowHeight;
     for(let b=0;b<WF_BINS;b++){
       const intensity = row[b]; // 0..255
-      if(intensity === 0) continue;
-      // color map: low -> blue, mid -> cyan, high -> yellow
-      const t = intensity/255;
-      // lerp between colors
-      const rC = Math.min(255, Math.round(20 + t*235));
-      const gC = Math.min(255, Math.round(60 + t*195));
-      const bC = Math.min(255, Math.round(120 - t*80));
+      if(intensity <= 0) continue;
+      // color map: blue->cyan->yellowish
+      const t = intensity / 255.0;
+      // palette mixing
+      const rC = Math.round(10 + t*245); // brighten with t
+      const gC = Math.round(30 + t*220);
+      const bC = Math.round(80 - t*40);
       wfCtx.fillStyle = `rgb(${rC},${gC},${bC})`;
-      wfCtx.fillRect(b*binWidth, y, Math.ceil(binWidth), Math.ceil(rowHeight));
+      wfCtx.fillRect(Math.floor(b*binWidth), Math.floor(y), Math.ceil(binWidth), Math.ceil(rowHeight));
     }
   }
 
-  // draw frequency axis tick markers (min and max)
+  // add a faint axis label for min/max
   wfCtx.fillStyle = "rgba(255,255,255,0.08)";
   wfCtx.font = "11px Arial";
-  wfCtx.fillText("Min", 4, ch - 6);
+  wfCtx.fillText("Min", 6, ch - 6);
   wfCtx.fillText("Max", cw - 34, ch - 6);
 }
 
-/* animate active index across bins based on wfDirection; push rows and re-render */
-function waterfallStep(){
-  // advance index
-  wfPlayIndex += wfDirection;
-  if(wfPlayIndex >= WF_BINS){ wfPlayIndex = WF_BINS - 2; wfDirection = -1; }
-  if(wfPlayIndex < 0){ wfPlayIndex = 1; wfDirection = 1; }
+/* compute active bin index for step value (0..stepsPerCycle-1)
+   mapping produces forward sweep then backward sweep */
+function activeBinForStep(step){
+  const forwardSteps = WF_BINS - 1;
+  const stepsPerCycle = 2 * forwardSteps;
+  const s = step % stepsPerCycle;
+  if(s <= forwardSteps){
+    // forward (0 .. forwardSteps)
+    return s;
+  } else {
+    // backward (forwardSteps-1 down to 1)
+    return stepsPerCycle - s;
+  }
+}
 
-  // push a row for this active index
-  pushWaterfallRow(wfPlayIndex);
+/* single step tick for animation */
+function waterfallTick(){
+  const forwardSteps = WF_BINS - 1;
+  const stepsPerCycle = 2 * forwardSteps;
+  // compute active bin
+  const activeBin = activeBinForStep(wfStep);
+  // create row and push
+  const row = makeRowForBin(activeBin);
+  pushRow(row);
   drawWaterfall();
+  // advance step
+  wfStep = (wfStep + 1) % stepsPerCycle;
 }
 
-/* restart timer to use updated wfIntervalMs */
-function restartWaterfallTimer(){
-  if(wfAnimTimer) { clearInterval(wfAnimTimer); wfAnimTimer = null; }
-  wfAnimTimer = setInterval(waterfallStep, wfIntervalMs);
+/* manage timer */
+function restartWFTimer(stepMs){
+  // clear previous
+  if(wfTimer) { clearInterval(wfTimer); wfTimer = null; }
+  // schedule new
+  wfTimer = setInterval(waterfallTick, stepMs);
 }
 
-/* initialize waterfall on page load */
-initWaterfall();
-restartWaterfallTimer();
+/* initialize waterfall */
+initWFBuffers();
+restartWFTimer(150);
 
 /* initial checks */
 if(!navigator.bluetooth){
@@ -1094,7 +1126,6 @@ if(!navigator.bluetooth){
   sendInitBtn.disabled = true;
   stopAutoBtn.disabled = true;
 }
-
 </script>
 </body>
 </html>

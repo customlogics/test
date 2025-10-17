@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Car Battery Monitor — Main</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/modern-normalize/1.1.0/modern-normalize.min.css">
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;margin:0;background:#fafbfc;color:#0b1220}
+    header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#0b1220;color:#fff}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand .logo{width:36px;height:36px;border-radius:8px;background:#f6c84c;display:flex;align-items:center;justify-content:center;font-weight:700}
+    main{max-width:1100px;margin:18px auto;padding:18px}
+    .card{background:#fff;padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(12,15,22,0.06)}
+    .row{display:flex;gap:8px;align-items:center}
+    button{padding:8px 12px;border-radius:8px;border:none;background:#111;color:#fff;cursor:pointer}
+    a.disabled{opacity:.45;pointer-events:none;color:#666;text-decoration:none}
+    a{color:#f6c84c;text-decoration:none}
+    .small{font-size:13px;color:#666}
+    pre{background:#f3f4f6;padding:10px;border-radius:8px;overflow:auto}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">CAR</div>
+      <h1 style="font-size:18px;margin:0">Car Battery Monitor</h1>
+    </div>
+    <div class="row">
+      <div id="bleState" class="small">BLE: <strong id="bleLabel">Disconnected</strong></div>
+      <nav style="margin-left:18px">
+        <!-- Link to Data Log page (starts disabled) -->
+        <a id="datalogLink" class="disabled" href="data_log.html" target="_blank">Data Log</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2 style="margin-top:0">Web BLE control</h2>
+
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+        <button id="connectBtn">Connect / Reconnect</button>
+        <button id="disconnectBtn" style="background:#777">Disconnect</button>
+        <button id="requestLogBtn" style="background:#2b6cb0">Request Data Log</button>
+      </div>
+
+      <div style="display:flex;gap:18px;flex-wrap:wrap">
+        <div style="min-width:280px;flex:1" class="card">
+          <div class="small">Device info</div>
+          <div id="deviceName"><em>—</em></div>
+          <div id="deviceId" class="small" style="margin-top:6px">—</div>
+        </div>
+
+        <div style="min-width:280px;flex:1" class="card">
+          <div class="small">Last activity</div>
+          <div id="lastActivity"><em>—</em></div>
+        </div>
+      </div>
+
+      <hr style="margin:18px 0">
+
+      <div>
+        <div class="small">Debug / Logs</div>
+        <pre id="logArea" style="height:160px">Ready.</pre>
+      </div>
+    </div>
+  </main>
+
+<script>
+/*
+  index17.html — updated integration for Data Log page.
+
+  What to replace:
+    - VOLTAGE_CHAR_UUID
+    - CURRENT_CHAR_UUID
+    - COMMAND_CHAR_UUID (used to request log)
+  Your peripheral must expose the service:
+    84c8b77d-d34b-42fb-949f-cf33a747bb1f
+*/
+
+const SERVICE_UUID = '84c8b77d-d34b-42fb-949f-cf33a747bb1f'.toLowerCase();
+
+// ---- REPLACE these with your real characteristic UUIDs ----
+const VOLTAGE_CHAR_UUID = '0000aaaa-0000-1000-8000-00805f9b34fb'; // <-- placeholder
+const CURRENT_CHAR_UUID = '0000aaab-0000-1000-8000-00805f9b34fb'; // <-- placeholder
+const COMMAND_CHAR_UUID = '0000aaac-0000-1000-8000-00805f9b34fb'; // <-- placeholder
+// ----------------------------------------------------------
+
+const connectBtn = document.getElementById('connectBtn');
+const disconnectBtn = document.getElementById('disconnectBtn');
+const requestLogBtn = document.getElementById('requestLogBtn');
+const bleLabel = document.getElementById('bleLabel');
+const datalogLink = document.getElementById('datalogLink');
+const logArea = document.getElementById('logArea');
+const deviceNameEl = document.getElementById('deviceName');
+const deviceIdEl = document.getElementById('deviceId');
+const lastActivity = document.getElementById('lastActivity');
+
+let device = null;
+let server = null;
+let service = null;
+let voltageChar = null;
+let currentChar = null;
+let commandChar = null;
+
+let dataLogWindow = null; // reference to opened data_log.html window
+
+// We expect 1000 bytes per stream (as user specified). We'll collect chunks until we reach 1000.
+// If your peripheral sends exactly 1000 bytes in one notification you can simplify this.
+const EXPECTED_BYTES = 1000;
+
+let voltageBufferParts = [];
+let voltageBytesReceived = 0;
+
+let currentBufferParts = [];
+let currentBytesReceived = 0;
+
+function log(...args){
+  const s = args.join(' ');
+  logArea.textContent = `${new Date().toISOString()}  ${s}\n` + logArea.textContent;
+  lastActivity.textContent = new Date().toLocaleTimeString();
+}
+
+function setBleState(connected){
+  bleLabel.textContent = connected ? 'Connected' : 'Disconnected';
+  if(connected){
+    datalogLink.classList.remove('disabled');
+  } else {
+    datalogLink.classList.add('disabled');
+  }
+}
+
+// Helpers to open/ensure datalog window and call its API when ready
+function openDataLogWindow(){
+  if(dataLogWindow && !dataLogWindow.closed){
+    return dataLogWindow;
+  }
+  dataLogWindow = window.open('data_log.html', '_blank');
+  // Poll until datalog API becomes available on the new window
+  const t = setInterval(()=>{
+    try {
+      if(!dataLogWindow || dataLogWindow.closed){
+        clearInterval(t);
+        dataLogWindow = null;
+        return;
+      }
+      if(dataLogWindow.datalog && typeof dataLogWindow.datalog.enableForBle === 'function'){
+        dataLogWindow.datalog.enableForBle();
+        log('Data Log page initialized.');
+        clearInterval(t);
+      }
+    } catch(e){
+      // cross-origin shouldn't be an issue since pages are local - ignore errors
+    }
+  }, 250);
+  return dataLogWindow;
+}
+
+// Call this to forward assembled buffers to datalog page
+function forwardBuffersIfReady(){
+  if(dataLogWindow && dataLogWindow.datalog && typeof dataLogWindow.datalog.handleDataLogPackets === 'function'){
+    if(voltageBytesReceived >= EXPECTED_BYTES && currentBytesReceived >= EXPECTED_BYTES){
+      // Build Uint8Array(s)
+      const vBuf = mergeParts(voltageBufferParts, EXPECTED_BYTES);
+      const cBuf = mergeParts(currentBufferParts, EXPECTED_BYTES);
+
+      try{
+        dataLogWindow.datalog.handleDataLogPackets(vBuf, cBuf);
+        log('Forwarded full 1000-byte voltage+current buffers to Data Log page.');
+      } catch(e){
+        log('Error while forwarding to Data Log:', e.message || e);
+      }
+
+      // reset collectors for next transfer
+      voltageBufferParts = [];
+      currentBufferParts = [];
+      voltageBytesReceived = 0;
+      currentBytesReceived = 0;
+    }
+  } else {
+    log('Data Log page not ready — open it or call enable from parent if already open.');
+  }
+}
+
+function mergeParts(parts, expectedLen){
+  if(parts.length === 1 && parts[0].byteLength === expectedLen) return parts[0];
+  const out = new Uint8Array(expectedLen);
+  let offset = 0;
+  for(const p of parts){
+    const src = p instanceof Uint8Array ? p : new Uint8Array(p);
+    out.set(src, offset);
+    offset += src.byteLength;
+    if(offset >= expectedLen) break;
+  }
+  return out;
+}
+
+// ----- Notification handlers -----
+function onVoltageNotification(ev){
+  const value = ev.target.value || ev; // sometimes the characteristic returns event.detail
+  // value is a DataView or a BluetoothRemoteGATTCharacteristicEvent
+  let data;
+  if(value instanceof DataView){
+    data = new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
+  } else if (value instanceof ArrayBuffer){
+    data = new Uint8Array(value);
+  } else if (ev.target && ev.target.value){
+    const dv = ev.target.value;
+    data = new Uint8Array(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength));
+  } else {
+    // fallback
+    data = new Uint8Array([]);
+  }
+
+  voltageBufferParts.push(data);
+  voltageBytesReceived += data.byteLength;
+  log(`Voltage chunk received: ${data.byteLength} bytes (total ${voltageBytesReceived}/${EXPECTED_BYTES})`);
+  forwardBuffersIfReady();
+}
+
+function onCurrentNotification(ev){
+  let data;
+  if(ev.target && ev.target.value){
+    const dv = ev.target.value;
+    data = new Uint8Array(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength));
+  } else if (ev instanceof DataView){
+    data = new Uint8Array(ev.buffer.slice(ev.byteOffset, ev.byteOffset + ev.byteLength));
+  } else {
+    data = new Uint8Array([]);
+  }
+
+  currentBufferParts.push(data);
+  currentBytesReceived += data.byteLength;
+  log(`Current chunk received: ${data.byteLength} bytes (total ${currentBytesReceived}/${EXPECTED_BYTES})`);
+  forwardBuffersIfReady();
+}
+
+// ----- BLE connect flow -----
+async function connectBLE(){
+  try{
+    log('Requesting Bluetooth device...');
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{services: [SERVICE_UUID]}],
+      optionalServices: [SERVICE_UUID]
+    });
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    deviceNameEl.textContent = device.name || 'Unnamed device';
+    deviceIdEl.textContent = device.id || '—';
+
+    log('Connecting GATT server...');
+    server = await device.gatt.connect();
+
+    setBleState(true);
+    log('Connected to GATT server.');
+    server.addEventListener && server.addEventListener('gattserverdisconnected', onDisconnected);
+
+    log('Getting service...');
+    service = await server.getPrimaryService(SERVICE_UUID);
+
+    // Get characteristics. If your device uses different UUIDs or a single characteristic to multiplex both streams,
+    // replace the calls below accordingly.
+    try {
+      voltageChar = await service.getCharacteristic(VOLTAGE_CHAR_UUID);
+      log('Voltage characteristic found.');
+    } catch(e){
+      log('Voltage characteristic NOT found. Replace VOLTAGE_CHAR_UUID placeholder with actual UUID.');
+      voltageChar = null;
+    }
+
+    try {
+      currentChar = await service.getCharacteristic(CURRENT_CHAR_UUID);
+      log('Current characteristic found.');
+    } catch(e){
+      log('Current characteristic NOT found. Replace CURRENT_CHAR_UUID placeholder with actual UUID.');
+      currentChar = null;
+    }
+
+    try {
+      commandChar = await service.getCharacteristic(COMMAND_CHAR_UUID);
+      log('Command characteristic found.');
+    } catch(e){
+      log('Command characteristic NOT found (optional). Replace COMMAND_CHAR_UUID placeholder if needed.');
+      commandChar = null;
+    }
+
+    // Start notifications if characteristics available
+    if(voltageChar){
+      await voltageChar.startNotifications();
+      voltageChar.addEventListener('characteristicvaluechanged', onVoltageNotification);
+      log('Voltage notifications started.');
+    }
+
+    if(currentChar){
+      await currentChar.startNotifications();
+      currentChar.addEventListener('characteristicvaluechanged', onCurrentNotification);
+      log('Current notifications started.');
+    }
+
+    // Open Data Log page and enable it
+    openDataLogWindow();
+
+  } catch(err){
+    log('Connection failed:', err.message || err);
+    setBleState(false);
+  }
+}
+
+function onDisconnected(){
+  log('Device disconnected.');
+  setBleState(false);
+  // keep dataLogWindow open (user may still want to view last plot)
+}
+
+// Disconnect cleanly
+async function disconnectBLE(){
+  try {
+    if(device && device.gatt && device.gatt.connected){
+      device.gatt.disconnect();
+      log('Requested disconnect.');
+    } else {
+      log('No connected device.');
+    }
+  } catch(e){
+    log('Error during disconnect:', e.message || e);
+  }
+  setBleState(false);
+}
+
+// Write command to request log from device (you will later replace payload)
+async function requestDataLog(){
+  if(!commandChar){
+    log('Command characteristic not available; cannot request log from device. You can still open Data Log and push data from JS for testing.');
+    return;
+  }
+  // TODO: Replace the bytes below with the actual command your device expects to send the 1000-byte voltage + 1000-byte current transfer.
+  const CMD_REQUEST_LOG = new Uint8Array([0x01, 0x02, 0x03]); // <-- placeholder
+  try {
+    await commandChar.writeValue(CMD_REQUEST_LOG);
+    log('Sent request-log command to device.');
+  } catch(e){
+    log('Failed to write request command:', e.message || e);
+  }
+}
+
+// UI wiring
+connectBtn.addEventListener('click', connectBLE);
+disconnectBtn.addEventListener('click', disconnectBLE);
+requestLogBtn.addEventListener('click', async ()=>{
+  // Ensure datalog window opened and ready
+  openDataLogWindow();
+  // Give datalog window a moment to be ready, then call request
+  setTimeout(()=> requestDataLog(), 400);
+});
+
+// When the user clicks the Data Log link we still want to ensure datalog is aware of BLE state.
+// So we hook into link clicks and open via helper so we can call enableForBle if connected.
+datalogLink.addEventListener('click', (ev)=>{
+  if(datalogLink.classList.contains('disabled')){
+    ev.preventDefault();
+    return;
+  }
+  // open via helper (this will also call enableForBle when ready)
+  ev.preventDefault();
+  openDataLogWindow();
+});
+
+// Clean up when the page is closed or reloaded
+window.addEventListener('beforeunload', ()=>{
+  if(dataLogWindow && !dataLogWindow.closed){
+    try { dataLogWindow.close(); } catch(e) {}
+  }
+});
+
+// Simple feature: allow pasting raw voltage/current arrays into parent for manual testing
+window.addEventListener('message', (msg)=>{
+  // For debugging: if we receive {type:'injectBuffers', voltage:ArrayBuffer, current:ArrayBuffer}
+  try {
+    const d = msg.data;
+    if(d && d.type === 'injectBuffers'){
+      log('Manual buffer injection received via postMessage.');
+      // forward to datalog (ensures datalog open)
+      openDataLogWindow();
+      setTimeout(()=>{
+        try {
+          dataLogWindow.datalog.handleDataLogPackets(d.voltage, d.current);
+          log('Injected buffers forwarded to Data Log.');
+        } catch(e){
+          log('Injection forward failed:', e.message || e);
+        }
+      }, 300);
+    }
+  } catch(e){}
+});
+
+log('Page ready. Click Connect to discover device.');
+</script>
+</body>
+</html>

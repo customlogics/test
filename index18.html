@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>CARCAT 5G — Serpentine Waterfall Fixed</title>
+<title>CARCAT 5G — Waterfall with Oscillation</title>
 <style>
   :root{--bg:#071018;--card:#12202a;--text:#fff;--muted:#9fb0c0;--accent-1:#27b56b;--icon-yellow:#FFD54A}
   html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#03060a,#071018);color:var(--text)}
@@ -25,18 +25,25 @@
   .wfTopBar{display:flex;gap:12px;align-items:center;margin-bottom:8px}
   .wfBlue{background:#2b7bff;padding:8px 12px;border-radius:8px;color:white;font-weight:800}
   .wfGreen{background:#16a34a;padding:8px 12px;border-radius:8px;color:white;font-weight:700}
-  input[type=range]{width:140px}
+  .footer{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+  input[type="range"]{width:140px}
   @media (max-width:980px){.wrap{grid-template-columns:1fr;padding:12px}.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- Left Column -->
+    <!-- Left column -->
     <div class="left">
       <div class="hero">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><h1 style="margin:0;color:var(--icon-yellow)">CARCAT 5G - Wave</h1><div class="muted">Car Battery Monitor — BLE telemetry & config</div></div>
-          <div style="text-align:right"><div class="muted">Connected to</div><div id="deviceName" class="badge">Not connected</div></div>
+          <div>
+            <h1 style="margin:0;color:var(--icon-yellow)">CARCAT 5G - Wave</h1>
+            <div class="muted">Car Battery Monitor — BLE telemetry & config</div>
+          </div>
+          <div style="text-align:right">
+            <div class="muted">Connected to</div>
+            <div id="deviceName" class="badge">Not connected</div>
+          </div>
         </div>
 
         <div style="margin-top:12px;display:flex;gap:8px">
@@ -62,13 +69,16 @@
 
       <div class="tile" style="margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-weight:800">Quick</div><div class="muted">Console TX/RX logs are in browser console</div></div>
+          <div>
+            <div style="font-weight:800">Quick</div>
+            <div class="muted">Console TX/RX logs are in browser console</div>
+          </div>
           <div><button id="openSetup" class="ghost">Setup</button></div>
         </div>
       </div>
     </div>
 
-    <!-- Right Column -->
+    <!-- Right column -->
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div style="font-size:18px;font-weight:800">Dashboard</div>
@@ -78,7 +88,10 @@
       <div class="grid">
         <div class="tile" id="card_voltage" style="border-left:6px solid #2dd4bf">
           <div class="heading"><div>Car Battery Voltage</div><div class="muted">LIVE</div></div>
-          <div class="metric"><div class="value" id="card_battery">-- V</div><div class="muted">instant</div></div>
+          <div class="metric">
+            <div class="value" id="card_battery">-- V</div>
+            <div class="muted">instant</div>
+          </div>
           <div class="muted" id="card_battery_sub">From LIVE</div>
         </div>
 
@@ -112,22 +125,22 @@
           <div class="muted">Controls waterfall sweep speed</div>
         </div>
 
-        <!-- Waterfall tile -->
+        <!-- Waterfall tile (grid-column full width) -->
         <div class="tile" id="card_waterfall" style="grid-column:1/-1;border-left:6px solid #0ea5e9">
-          <div class="heading"><div>Visualization (Waterfall)</div><div class="muted">Serpentine waterfall</div></div>
+          <div class="heading"><div>Visualization (Waterfall)</div><div class="muted">Serpentine waterfall + oscillation</div></div>
           <div class="wfTopBar">
             <div class="wfBlue" id="wfCurrentFreq">-- kHz</div>
             <div class="wfGreen" id="wfStep">Step: --/--</div>
             <div class="muted" id="wfRange">Range: -- kHz</div>
             <div style="margin-left:12px" class="muted">Bins</div>
-            <input id="wfBinsSlider" type="range" min="10" max="100" value="100">
-            <div class="badge" id="wfBinsLabel">100</div>
+            <input id="wfBinsSlider" type="range" min="10" max="100" value="46">
+            <div class="badge" id="wfBinsLabel">46</div>
           </div>
           <canvas id="waterfallCanvas" style="width:100%;height:260px;background:#041028;border-radius:8px;display:block"></canvas>
           <div style="margin-top:8px" class="muted">Time → upward • Sweep fills row, then pushes up (serpentine)</div>
         </div>
 
-        <!-- Feature cards (kept) -->
+        <!-- Feature cards (unchanged layout) -->
         <div class="tile" id="feat_beep_card" style="border-left:6px solid #ff6fa6">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div><div style="font-weight:800">Audible beep</div><div class="muted">Duration (after every)</div></div>
@@ -178,14 +191,18 @@
 
       </div>
 
-      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
-        <div style="display:flex;gap:12px;align-items:center"><div id="statusDot" style="width:12px;height:12px;border-radius:50%;background:#ff6b6b"></div><div class="muted" id="bleText">Disconnected</div></div>
+      <div class="footer">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div id="statusDot" style="width:12px;height:12px;border-radius:50%;background:#ff6b6b"></div>
+          <div class="muted" id="bleText">Disconnected</div>
+        </div>
         <div><button id="copyParsed" class="ghost">Copy LIVE</button> <button id="copyInit" class="ghost">Copy INIT</button></div>
       </div>
+
     </div>
   </div>
 
-  <!-- minimal modal -->
+  <!-- Modal (unchanged) -->
   <div id="modalBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:2000">
     <div style="width:420px;background:#f6fbff;padding:16px;border-radius:10px;color:#0b1220">
       <div style="text-align:right"><span id="modalClose" style="cursor:pointer">✕</span></div>
@@ -208,17 +225,32 @@
   </div>
 
 <script>
-/* === App (BLE/parsers/modals preserved) === */
-/* -- only the waterfall module below was replaced with a robust history-based serpentine implementation -- */
-
-/* UUIDs & frames */
+/* ===== preserved app logic (UUIDs, BLE, parsing, modal, save) ===== */
 const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
 const notifyCharUuid = "0000fff1-0000-1000-8000-00805f9b34fb";
 const writeCharUuid = "0000fff2-0000-1000-8000-00805f9b34fb";
+
 const LIVE_CMD_HEX = "FD FC FB FA 04 00 4C 49 56 45 04 03 02 01";
 const INIT_CMD_HEX = "FD FC FB FA 04 00 49 4E 49 54 04 03 02 01";
 
-/* DOM refs we use */
+const CMD_BYTES = {
+  beep: [0x42,0x45,0x45,0x50],
+  standby: [0x53,0x54,0x41,0x4E],
+  shutdown: [0x53,0x48,0x55,0x54],
+  hiss: [0x48,0x49,0x53,0x53]
+};
+
+function hexToBytes(hexStr){
+  const cleaned = hexStr.replace(/0x/g,"").replace(/[^A-Fa-f0-9]/g,"");
+  const out = new Uint8Array(cleaned.length/2);
+  for(let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
+  return out;
+}
+function bytesToHexUpper(bytes){
+  return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+}
+
+/* DOM refs */
 const connectButton = document.getElementById("connectButton");
 const disconnectButton = document.getElementById("disconnectButton");
 const sendLiveBtn = document.getElementById("sendLiveBtn");
@@ -232,31 +264,51 @@ const deviceName = document.getElementById("deviceName");
 const bleText = document.getElementById("bleText");
 const statusDot = document.getElementById("statusDot");
 const autoStatus = document.getElementById("autoStatus");
+
 const card_battery = document.getElementById("card_battery");
 const card_current_val = document.getElementById("card_current_val");
 const card_temp_value = document.getElementById("card_temp_value");
 const card_minfreq_val = document.getElementById("card_minfreq_val");
 const card_maxfreq_val = document.getElementById("card_maxfreq_val");
 const card_waveval = document.getElementById("card_waveval");
+
+const beep_enabled_card = document.getElementById("beep_enabled_card");
+const beep_set = document.getElementById("beep_set");
+const beep_default_card = document.getElementById("beep_default_card");
+const beep_minmax = document.getElementById("beep_minmax");
+
+const standby_enabled_card = document.getElementById("standby_enabled_card");
+const standby_set = document.getElementById("standby_set");
+const standby_default_card = document.getElementById("standby_default_card");
+const standby_minmax = document.getElementById("standby_minmax");
+
+const shutdown_enabled_card = document.getElementById("shutdown_enabled_card");
+const shutdown_set = document.getElementById("shutdown_set");
+const shutdown_default_card = document.getElementById("shutdown_default_card");
+const shutdown_minmax = document.getElementById("shutdown_minmax");
+
+const hiss_enabled_card = document.getElementById("hiss_enabled_card");
+const hiss_set = document.getElementById("hiss_set");
+const hiss_default_card = document.getElementById("hiss_default_card");
+const hiss_minmax = document.getElementById("hiss_minmax");
+
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalToggle = document.getElementById('modalToggle');
+const modalSlider = document.getElementById('modalSlider');
+const modalSliderValue = document.getElementById('modalSliderValue');
+const modalReset = document.getElementById('modalReset');
+const modalSave = document.getElementById('modalSave');
+const modalClose = document.getElementById('modalClose');
+const modalTitle = document.getElementById('modalTitle');
+
 const wfCanvas = document.getElementById('waterfallCanvas');
+const wfBinsSlider = document.getElementById('wfBinsSlider');
+const wfBinsLabel = document.getElementById('wfBinsLabel');
 const wfCurrentFreq = document.getElementById('wfCurrentFreq');
 const wfStepEl = document.getElementById('wfStep');
 const wfRangeEl = document.getElementById('wfRange');
-const wfBinsSlider = document.getElementById('wfBinsSlider');
-const wfBinsLabel = document.getElementById('wfBinsLabel');
 
-/* helpers */
-function hexToBytes(hexStr){
-  const cleaned = hexStr.replace(/0x/g,"").replace(/[^A-Fa-f0-9]/g,"");
-  const out = new Uint8Array(cleaned.length/2);
-  for(let i=0;i<cleaned.length;i+=2) out[i/2] = parseInt(cleaned.substr(i,2),16);
-  return out;
-}
-function bytesToHexUpper(bytes){
-  return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
-}
-
-/* basic state */
+/* app state */
 let device, server, notifyChar, writeChar;
 let lastPacket = null;
 let currentInitData = null;
@@ -265,12 +317,7 @@ let writeInProgress = false;
 let pendingSave = null;
 let awaitingInitPromise = null;
 
-/* parsing helpers */
-function readU8(buf, idx){ return (idx < buf.length) ? buf[idx] : null; }
-function readU16le(buf, lo, hi){ const l=readU8(buf,lo), h=readU8(buf,hi); if(l===null||h===null) return null; return (h<<8) | l; }
-function isTagAt(buf, offset, tagStr){ if(!buf || buf.length < offset + tagStr.length) return false; for(let i=0;i<tagStr.length;i++) if(buf[offset+i] !== tagStr.charCodeAt(i)) return false; return true; }
-
-/* append raw */
+/* small utils */
 function appendRaw(bytes, label=''){
   const t = new Date().toLocaleTimeString();
   lastPacket = bytes;
@@ -279,8 +326,11 @@ function appendRaw(bytes, label=''){
   recvRaw.scrollTop = recvRaw.scrollHeight;
   console.log(`RX${tag}: ${bytesToHexUpper(bytes)}`);
 }
+function readU8(buf, idx){ return (idx < buf.length) ? buf[idx] : null; }
+function readU16le(buf, lo, hi){ const l=readU8(buf,lo), h=readU8(buf,hi); if(l===null||h===null) return null; return (h<<8) | l; }
+function isTagAt(buf, offset, tagStr){ if(!buf || buf.length < offset + tagStr.length) return false; for(let i=0;i<tagStr.length;i++) if(buf[offset+i] !== tagStr.charCodeAt(i)) return false; return true; }
 
-/* LIVE parser */
+/* parse live/init (unchanged) */
 function parseLivePacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 28) return { error:"LIVE too short" };
@@ -315,7 +365,6 @@ function showLive(obj){
   }
 }
 
-/* INIT parser (kept) */
 function parseInitPacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 51) return { error:"INIT too short" };
@@ -359,44 +408,89 @@ function parseInitPacket(bytes){
 function showInit(obj){
   if(!obj || obj.error){ currentInitData = null; return; }
   currentInitData = obj;
-  document.getElementById("beep_enabled_card").textContent = obj.beep.enabled ? "Enabled" : "Disabled";
-  document.getElementById("beep_set").textContent = (obj.beep.value!=null) ? `${obj.beep.value} s` : "-- s";
-  document.getElementById("beep_default_card").textContent = (obj.beep.def!=null) ? `${obj.beep.def} s` : "-- s";
-  document.getElementById("beep_minmax").textContent = `${obj.beep.min ?? "--"} / ${obj.beep.max ?? "--"} s`;
 
-  document.getElementById("standby_enabled_card").textContent = obj.standby.enabled ? "Enabled" : "Disabled";
-  document.getElementById("standby_set").textContent = (obj.standby.value_mV!=null) ? `${(obj.standby.value_mV/1000).toFixed(3)} V` : "-- V";
-  document.getElementById("standby_default_card").textContent = (obj.standby.def_mV!=null) ? `${(obj.standby.def_mV/1000).toFixed(3)} V` : "-- V";
-  document.getElementById("standby_minmax").textContent = `${(obj.standby.min_mV!=null ? (obj.standby.min_mV/1000).toFixed(3):"--")} / ${(obj.standby.max_mV!=null ? (obj.standby.max_mV/1000).toFixed(3):"--")} V`;
+  beep_enabled_card.textContent = obj.beep.enabled ? "Enabled" : "Disabled";
+  beep_set.textContent = (obj.beep.value!=null) ? `${obj.beep.value} s` : "-- s";
+  beep_default_card.textContent = (obj.beep.def!=null) ? `${obj.beep.def} s` : "-- s";
+  beep_minmax.textContent = `${obj.beep.min ?? "--"} / ${obj.beep.max ?? "--"} s`;
 
-  document.getElementById("shutdown_enabled_card").textContent = obj.shutdown.enabled ? "Enabled" : "Disabled";
-  document.getElementById("shutdown_set").textContent = (obj.shutdown.value_mV!=null) ? `${(obj.shutdown.value_mV/1000).toFixed(3)} V` : "-- V";
-  document.getElementById("shutdown_default_card").textContent = (obj.shutdown.def_mV!=null) ? `${(obj.shutdown.def_mV/1000).toFixed(3)} V` : "-- V";
-  document.getElementById("shutdown_minmax").textContent = `${(obj.shutdown.min_mV!=null ? (obj.shutdown.min_mV/1000).toFixed(3):"--")} / ${(obj.shutdown.max_mV!=null ? (obj.shutdown.max_mV/1000).toFixed(3):"--")} V`;
+  standby_enabled_card.textContent = obj.standby.enabled ? "Enabled" : "Disabled";
+  standby_set.textContent = (obj.standby.value_mV!=null) ? `${(obj.standby.value_mV/1000).toFixed(3)} V` : "-- V";
+  standby_default_card.textContent = (obj.standby.def_mV!=null) ? `${(obj.standby.def_mV/1000).toFixed(3)} V` : "-- V";
+  standby_minmax.textContent = `${(obj.standby.min_mV!=null ? (obj.standby.min_mV/1000).toFixed(3):"--")} / ${(obj.standby.max_mV!=null ? (obj.standby.max_mV/1000).toFixed(3):"--")} V`;
 
-  document.getElementById("hiss_enabled_card").textContent = obj.hiss.enabled ? "Enabled" : "Disabled";
-  document.getElementById("hiss_set").textContent = (obj.hiss.value_pct!=null) ? `${obj.hiss.value_pct} %` : "-- %";
-  document.getElementById("hiss_default_card").textContent = (obj.hiss.def_pct!=null) ? `${obj.hiss.def_pct} %` : "-- %";
-  document.getElementById("hiss_minmax").textContent = `${obj.hiss.min_pct ?? "--"} / ${obj.hiss.max_pct ?? "--"} %`;
+  shutdown_enabled_card.textContent = obj.shutdown.enabled ? "Enabled" : "Disabled";
+  shutdown_set.textContent = (obj.shutdown.value_mV!=null) ? `${(obj.shutdown.value_mV/1000).toFixed(3)} V` : "-- V";
+  shutdown_default_card.textContent = (obj.shutdown.def_mV!=null) ? `${(obj.shutdown.def_mV/1000).toFixed(3)} V` : "-- V";
+  shutdown_minmax.textContent = `${(obj.shutdown.min_mV!=null ? (obj.shutdown.min_mV/1000).toFixed(3):"--")} / ${(obj.shutdown.max_mV!=null ? (obj.shutdown.max_mV/1000).toFixed(3):"--")} V`;
+
+  hiss_enabled_card.textContent = obj.hiss.enabled ? "Enabled" : "Disabled";
+  hiss_set.textContent = (obj.hiss.value_pct!=null) ? `${obj.hiss.value_pct} %` : "-- %";
+  hiss_default_card.textContent = (obj.hiss.def_pct!=null) ? `${obj.hiss.def_pct} %` : "-- %";
+  hiss_minmax.textContent = `${obj.hiss.min_pct ?? "--"} / ${obj.hiss.max_pct ?? "--"} %`;
 
   console.log("INIT parsed & UI updated");
 }
 
-/* BLE write helper */
-async function writeFrame(bytes,label){
+/* write helpers and save/ACK logic (unchanged) */
+async function writeFrame(bytes, label){
   if(!writeChar) throw new Error("Not connected");
   console.log("TX " + label + ": " + bytesToHexUpper(bytes));
   try { writeInProgress = true; await writeChar.writeValue(bytes); }
-  finally { writeInProgress = false; }
+  catch(e){ console.error("Write error:", e); throw e; }
+  finally{ writeInProgress = false; }
 }
-async function sendLiveCmd(){ if(writeInProgress) return; await writeFrame(hexToBytes(LIVE_CMD_HEX),"LIVE"); }
-async function sendInitCmd(){ if(writeInProgress) return; await writeFrame(hexToBytes(INIT_CMD_HEX),"INIT"); }
+async function sendLiveCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(LIVE_CMD_HEX); await writeFrame(d, "LIVE"); }
+async function sendInitCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(INIT_CMD_HEX); await writeFrame(d, "INIT"); }
 
-/* connect/disconnect */
-async function connect(){
-  if(!navigator.bluetooth){ alert("Web Bluetooth not available"); return; }
-  try{
-    device = await navigator.bluetooth.requestDevice({ filters:[{ namePrefix:"CARCAT" },{ name:"CARCAT_5G" }], optionalServices:[serviceUuid] });
+async function performSaveWrite(featureKey, enabledNow, sliderRaw){
+  if(!writeChar) throw new Error("Not connected");
+  if(writeInProgress) throw new Error("Write in progress");
+  const cmd = CMD_BYTES[featureKey];
+  if(!cmd) throw new Error("Unknown feature cmd");
+
+  const frame = new Uint8Array(4 + 2 + 4 + 1 + 2 + 4);
+  let p = 0;
+  frame[p++] = 0xFD; frame[p++] = 0xFC; frame[p++] = 0xFB; frame[p++] = 0xFA;
+  frame[p++] = 0x07; frame[p++] = 0x00;
+  frame[p++] = cmd[0]; frame[p++] = cmd[1]; frame[p++] = cmd[2]; frame[p++] = cmd[3];
+  frame[p++] = enabledNow & 0xFF;
+  frame[p++] = sliderRaw & 0xFF;
+  frame[p++] = (sliderRaw >> 8) & 0xFF;
+  frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
+
+  console.log(`TX SAVE [${featureKey}] (EN=${enabledNow}) : ${bytesToHexUpper(frame)}`);
+  await writeFrame(frame, `SAVE-${featureKey}`);
+
+  return waitForInitAck(featureKey, sliderRaw, 5000);
+}
+
+function waitForNextInit(timeoutMs = 3000) {
+  if (awaitingInitPromise) return awaitingInitPromise;
+  let timer;
+  awaitingInitPromise = new Promise((resolve, reject) => {
+    timer = setTimeout(() => { awaitingInitPromise = null; reject(new Error("INIT timeout")); }, timeoutMs);
+    awaitingInitPromise._resolve = (initParsed) => { clearTimeout(timer); awaitingInitPromise = null; resolve(initParsed); };
+  });
+  return awaitingInitPromise;
+}
+function waitForInitAck(feature, value, timeoutMs = 5000){
+  if(pendingSave) throw new Error("pendingSave already exists");
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { if (pendingSave) pendingSave = null; reject(new Error("timeout")); }, timeoutMs);
+    pendingSave = { feature, value,
+      resolve: (info) => { clearTimeout(timer); pendingSave = null; resolve(info); },
+      reject: (err) => { clearTimeout(timer); pendingSave = null; reject(err); }
+    };
+  });
+}
+
+/* BLE connect/notify handlers (unchanged) */
+async function connect() {
+  if (!navigator.bluetooth) { alert("Web Bluetooth is not available in this browser."); return; }
+  try {
+    device = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "CARCAT" }, { name: "CARCAT_5G" }], optionalServices: [serviceUuid] });
+    if (!device) return;
     device.addEventListener("gattserverdisconnected", onDeviceDisconnected);
     server = await device.gatt.connect();
     const svc = await server.getPrimaryService(serviceUuid);
@@ -404,193 +498,265 @@ async function connect(){
     writeChar = await svc.getCharacteristic(writeCharUuid);
     await notifyChar.startNotifications();
     notifyChar.addEventListener("characteristicvaluechanged", onNotify);
-    deviceName.textContent = device.name || device.id;
-    bleText.textContent = "Connected"; statusDot.style.background = "#10b981";
-    connectButton.disabled = true; disconnectButton.disabled = false;
-    sendLiveBtn.disabled = false; sendInitBtn.disabled = false;
-    startAutoBtn.disabled = false; stopAutoBtn.disabled = true;
-  }catch(e){ console.error(e); alert("Connect failed: "+e); }
-}
-function onDeviceDisconnected(){ deviceName.textContent="Not connected"; bleText.textContent="Disconnected"; statusDot.style.background="#ff6b6b"; connectButton.disabled=false; disconnectButton.disabled=true; sendLiveBtn.disabled=true; sendInitBtn.disabled=true; startAutoBtn.disabled=true; stopAutoBtn.disabled=true; }
-async function disconnect(){ try{ if(device && device.gatt.connected) device.gatt.disconnect(); }catch(e){} onDeviceDisconnected(); }
 
-/* notify handler */
+    deviceName.textContent = device.name || device.id;
+    bleText.textContent = "Connected";
+    statusDot.style.background = "#10b981";
+
+    connectButton.disabled = true;
+    disconnectButton.disabled = false;
+    sendLiveBtn.disabled = false;
+    sendInitBtn.disabled = false;
+    startAutoBtn.disabled = false;
+    stopAutoBtn.disabled = true;
+  } catch (error) {
+    console.error("Connect failed:", error);
+    deviceName.textContent = "Not connected";
+    bleText.textContent = "Disconnected";
+    statusDot.style.background = "#ff6b6b";
+    connectButton.disabled = false;
+  }
+}
+function onDeviceDisconnected() {
+  deviceName.textContent = "Not connected";
+  bleText.textContent = "Disconnected";
+  statusDot.style.background = "#ff6b6b";
+  connectButton.disabled = false;
+  disconnectButton.disabled = true;
+  sendLiveBtn.disabled = true;
+  sendInitBtn.disabled = true;
+  startAutoBtn.disabled = true;
+  stopAutoBtn.disabled = true;
+}
+async function disconnect() { try{ if(device && device.gatt.connected) device.gatt.disconnect(); }catch(e){} onDeviceDisconnected(); }
+
 function onNotify(ev){
   const arr = new Uint8Array(ev.target.value.buffer);
-  if(isTagAt(arr,6,"LIVE") && arr.length >= 28){ appendRaw(arr,'LIVE'); const p = parseLivePacket(arr); if(!p.error) showLive(p); return; }
-  if(isTagAt(arr,6,"INIT") && arr.length >= 51){ appendRaw(arr,'INIT'); const ip = parseInitPacket(arr); if(!ip.error){ showInit(ip); if(awaitingInitPromise && typeof awaitingInitPromise._resolve === 'function'){ awaitingInitPromise._resolve(ip); awaitingInitPromise = null; } try{ const buf = ip._rawBuf; if(pendingSave && buf && buf.length > 10 && buf[10] === 1){ pendingSave.resolve({ feature: pendingSave.feature, value: pendingSave.value, buf }); pendingSave = null; } }catch(e){console.warn(e);} } return; }
-  appendRaw(arr,'');
-}
 
-/* auto LIVE */
-function startAutoLive(){ if(autoIntervalId) return; if(!writeChar) return alert("Not connected"); autoStatus.textContent="Auto ON"; startAutoBtn.disabled=true; stopAutoBtn.disabled=false; autoIntervalId=setInterval(()=>{ if(!writeInProgress) sendLiveCmd(); },500); }
-function stopAutoLive(){ if(autoIntervalId) clearInterval(autoIntervalId); autoIntervalId=null; autoStatus.textContent="Idle"; startAutoBtn.disabled=false; stopAutoBtn.disabled=true; }
+  if (isTagAt(arr, 6, "LIVE") && arr.length >= 28) {
+    appendRaw(arr, 'LIVE');
+    const liveParsed = parseLivePacket(arr);
+    if (!liveParsed.error) showLive(liveParsed);
+    return;
+  }
 
-/* wait for init helper */
-function waitForNextInit(timeoutMs = 3000){
-  if(awaitingInitPromise) return awaitingInitPromise;
-  let timer;
-  awaitingInitPromise = new Promise((resolve,reject)=>{ timer = setTimeout(()=>{ awaitingInitPromise=null; reject(new Error("INIT timeout")); }, timeoutMs); awaitingInitPromise._resolve = (initParsed)=>{ clearTimeout(timer); awaitingInitPromise=null; resolve(initParsed); }; });
-  return awaitingInitPromise;
-}
-function waitForInitAck(feature, value, timeoutMs = 5000){
-  if(pendingSave) throw new Error("pendingSave exists");
-  return new Promise((resolve,reject)=>{ const timer=setTimeout(()=>{ if(pendingSave) pendingSave=null; reject(new Error("timeout")); }, timeoutMs); pendingSave = { feature, value, resolve: (info)=>{ clearTimeout(timer); pendingSave=null; resolve(info); }, reject: (err)=>{ clearTimeout(timer); pendingSave=null; reject(err); } }; });
-}
+  if (isTagAt(arr, 6, "INIT") && arr.length >= 51) {
+    appendRaw(arr, 'INIT');
+    const initParsed = parseInitPacket(arr);
+    if (!initParsed.error) {
+      showInit(initParsed);
 
-/* save write builder */
-const CMD_BYTES = { beep:[0x42,0x45,0x45,0x50], standby:[0x53,0x54,0x41,0x4E], shutdown:[0x53,0x48,0x55,0x54], hiss:[0x48,0x49,0x53,0x53] };
-async function performSaveWrite(featureKey, enabledNow, sliderRaw){
-  if(!writeChar) throw new Error("Not connected");
-  if(writeInProgress) throw new Error("Write in progress");
-  const cmd = CMD_BYTES[featureKey]; if(!cmd) throw new Error("Unknown");
-  const frame = new Uint8Array(4+2+4+1+2+4);
-  let p=0; frame[p++]=0xFD; frame[p++]=0xFC; frame[p++]=0xFB; frame[p++]=0xFA; frame[p++]=0x07; frame[p++]=0x00;
-  frame[p++]=cmd[0]; frame[p++]=cmd[1]; frame[p++]=cmd[2]; frame[p++]=cmd[3];
-  frame[p++]=enabledNow&0xFF; frame[p++]=sliderRaw&0xFF; frame[p++]=(sliderRaw>>8)&0xFF;
-  frame[p++]=0x04; frame[p++]=0x03; frame[p++]=0x02; frame[p++]=0x01;
-  console.log("TX SAVE-"+featureKey+": "+bytesToHexUpper(frame));
-  await writeFrame(frame,"SAVE-"+featureKey);
-  return waitForInitAck(featureKey, sliderRaw, 5000);
+      if (awaitingInitPromise && typeof awaitingInitPromise._resolve === 'function') {
+        awaitingInitPromise._resolve(initParsed);
+        awaitingInitPromise = null;
+      }
+
+      // check pending save ack (byte index 10 == 1)
+      try {
+        const buf = initParsed._rawBuf;
+        if (pendingSave && buf && buf.length > 10 && buf[10] === 1) {
+          console.log("ACK INIT received (byte10==1) for pending save");
+          pendingSave.resolve({ feature: pendingSave.feature, value: pendingSave.value, buf });
+          pendingSave = null;
+        }
+      } catch (e) { console.warn("ack check error", e); }
+    }
+    return;
+  }
+
+  appendRaw(arr, '');
 }
 
 /* modal wiring (kept) */
-const modalBackdrop = document.getElementById('modalBackdrop');
-const modalToggle = document.getElementById('modalToggle');
-const modalSlider = document.getElementById('modalSlider');
-const modalSliderValue = document.getElementById('modalSliderValue');
-const modalReset = document.getElementById('modalReset');
-const modalSave = document.getElementById('modalSave');
-const modalClose = document.getElementById('modalClose');
-const modalTitle = document.getElementById('modalTitle');
-
+let editingFeature = null;
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
 
-let editingFeature = null;
 function openFeatureModal(featureKey){
-  if(!currentInitData) return alert("No INIT data available yet.");
-  const data = currentInitData[featureKey]; if(!data) return alert("Missing feature data");
+  if(!currentInitData) return alert("No INIT data available yet. Send INIT to populate.");
+  const data = currentInitData[featureKey];
+  if(!data) return alert("Feature data missing");
   editingFeature = featureKey;
-  modalTitle.textContent = ({beep:"Audible beep", standby:"Standby mode", shutdown:"Shutdown mode", hiss:"Audible Hiss band"})[featureKey]||"Edit Feature";
+  modalTitle.textContent = ({beep:"Audible beep", standby:"Standby mode", shutdown:"Shutdown mode", hiss:"Audible Hiss band"})[featureKey] || "Edit Feature";
   if(data.enabled) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
 
   if(featureKey === 'beep'){
-    modalSlider.min = data.min ?? 0; modalSlider.max = data.max ?? Math.max((data.min||0)+1, data.value||0); modalSlider.step = 1; modalSlider.value = data.value ?? data.def ?? modalSlider.min;
-    document.getElementById('sliderLabel').textContent = "Duration - (after every)"; updateModalSliderValueDisplaySeconds();
+    modalSlider.min = data.min ?? 0; modalSlider.max = data.max ?? Math.max((data.min||0)+1, data.value||0);
+    modalSlider.step = 1; modalSlider.value = data.value ?? data.def ?? modalSlider.min;
+    document.getElementById('sliderLabel').textContent = "Duration - (after every)";
+    updateModalSliderValueDisplaySeconds();
   } else if(featureKey === 'standby' || featureKey === 'shutdown'){
-    modalSlider.min = data.min_mV ?? 0; modalSlider.max = data.max_mV ?? Math.max((data.min_mV||0)+1, data.value_mV||0); modalSlider.step = 1; modalSlider.value = data.value_mV ?? data.def_mV ?? modalSlider.min;
-    document.getElementById('sliderLabel').textContent = featureKey==='standby'?"Charging voltage threshold":"Cut-off voltage"; updateModalSliderValueDisplayVolts();
+    const rawMin = data.min_mV ?? 0; const rawMax = data.max_mV ?? Math.max(rawMin+1, data.value_mV||0);
+    modalSlider.min = rawMin; modalSlider.max = rawMax; modalSlider.step = 1;
+    modalSlider.value = data.value_mV ?? data.def_mV ?? modalSlider.min;
+    document.getElementById('sliderLabel').textContent = featureKey === 'standby' ? "Charging voltage threshold" : "Cut-off voltage";
+    updateModalSliderValueDisplayVolts();
   } else if(featureKey === 'hiss'){
-    modalSlider.min = data.min_pct ?? 0; modalSlider.max = data.max_pct ?? Math.max((data.min_pct||0)+1, data.value_pct||0); modalSlider.step = 1; modalSlider.value = data.value_pct ?? data.def_pct ?? modalSlider.min;
-    document.getElementById('sliderLabel').textContent = "Play frequency (band %)"; updateModalSliderValueDisplayPercent();
+    modalSlider.min = data.min_pct ?? 0; modalSlider.max = data.max_pct ?? Math.max((data.min_pct||0)+1, data.value_pct||0);
+    modalSlider.step = 1; modalSlider.value = data.value_pct ?? data.def_pct ?? modalSlider.min;
+    document.getElementById('sliderLabel').textContent = "Play frequency (band %)";
+    updateModalSliderValueDisplayPercent();
   }
   modalBackdrop.style.display = 'flex';
 }
-modalToggle.addEventListener('click', ()=> { modalToggle.classList.toggle('on'); const knob = modalToggle.querySelector('.knob'); if(!knob) return; knob.style.left = modalToggle.classList.contains('on') ? '27px' : '3px'; });
-modalSlider.addEventListener('input', ()=> { if(editingFeature === 'beep') updateModalSliderValueDisplaySeconds(); else if(editingFeature==='standby' || editingFeature==='shutdown') updateModalSliderValueDisplayVolts(); else updateModalSliderValueDisplayPercent(); });
-modalReset.addEventListener('click', ()=> { if(!editingFeature || !currentInitData) return; const d = currentInitData[editingFeature]; if(!d) return; if(d.en_default) modalToggle.classList.add('on'); else modalToggle.classList.remove('on'); if(editingFeature==='beep'){ modalSlider.value = (d.def!=null)?d.def:(d.value!=null?d.value:modalSlider.min); updateModalSliderValueDisplaySeconds(); } else if(editingFeature==='standby' || editingFeature==='shutdown'){ modalSlider.value = (d.def_mV!=null)?d.def_mV:(d.value_mV!=null?d.value_mV:modalSlider.min); updateModalSliderValueDisplayVolts(); } else { modalSlider.value = (d.def_pct!=null)?d.def_pct:(d.value_pct!=null?d.value_pct:modalSlider.min); updateModalSliderValueDisplayPercent(); } });
+modalToggle.addEventListener('click', ()=> {
+  modalToggle.classList.toggle('on');
+  const knob = modalToggle.querySelector('.knob');
+  if(!knob) return;
+  if(modalToggle.classList.contains('on')) knob.style.left = '27px'; else knob.style.left = '3px';
+});
+modalSlider.addEventListener('input', ()=>{
+  if(editingFeature === 'beep') updateModalSliderValueDisplaySeconds();
+  else if(editingFeature === 'standby' || editingFeature === 'shutdown') updateModalSliderValueDisplayVolts();
+  else if(editingFeature === 'hiss') updateModalSliderValueDisplayPercent();
+});
+modalReset.addEventListener('click', ()=>{
+  if(!editingFeature || !currentInitData) return;
+  const d = currentInitData[editingFeature];
+  if(!d) return;
+  if(d.en_default) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+  if(editingFeature === 'beep'){ modalSlider.value = (d.def!=null)?d.def:(d.value!=null?d.value:modalSlider.min); updateModalSliderValueDisplaySeconds(); }
+  else if(editingFeature === 'standby' || editingFeature === 'shutdown'){ modalSlider.value = (d.def_mV!=null)?d.def_mV:(d.value_mV!=null?d.value_mV:modalSlider.min); updateModalSliderValueDisplayVolts(); }
+  else if(editingFeature === 'hiss'){ modalSlider.value = (d.def_pct!=null)?d.def_pct:(d.value_pct!=null?d.value_pct:modalSlider.min); updateModalSliderValueDisplayPercent(); }
+});
 modalClose.addEventListener('click', ()=> modalBackdrop.style.display='none');
-modalBackdrop.addEventListener('click', e => { if(e.target === modalBackdrop) modalBackdrop.style.display='none'; });
+modalBackdrop.addEventListener('click', e => { if(e.target === modalBackdrop) modalBackdrop.style.display = 'none'; });
 
 modalSave.addEventListener('click', async ()=>{
   if(!editingFeature || !currentInitData){ modalBackdrop.style.display='none'; return; }
-  if(!writeChar) return alert("Not connected");
-  if(writeInProgress) return alert("Write in progress");
-  const en = modalToggle.classList.contains('on')?1:0; const raw = parseInt(modalSlider.value,10);
-  modalSave.disabled = true; const prev = modalSave.textContent; modalSave.textContent="Saving...";
+  if(!writeChar) { alert("Not connected — can't send save command"); return; }
+  if(writeInProgress) { alert("Write in progress — try again"); return; }
+
+  const enabledNow = modalToggle.classList.contains('on') ? 1 : 0;
+  const sliderRaw = parseInt(modalSlider.value,10);
+  modalSave.disabled = true; const prevText = modalSave.textContent; modalSave.textContent = "Saving...";
   try{
-    await performSaveWrite(editingFeature, en, raw);
-    if(editingFeature==='beep'){ currentInitData.beep.enabled = en===1; currentInitData.beep.value = raw; }
-    else if(editingFeature==='standby'){ currentInitData.standby.enabled = en===1; currentInitData.standby.value_mV = raw; }
-    else if(editingFeature==='shutdown'){ currentInitData.shutdown.enabled = en===1; currentInitData.shutdown.value_mV = raw; }
-    else if(editingFeature==='hiss'){ currentInitData.hiss.enabled = en===1; currentInitData.hiss.value_pct = raw; }
-    showInit(currentInitData); modalBackdrop.style.display='none'; alert("Save acknowledged (INIT byte10=1).");
-  }catch(e){ console.warn(e); alert("No response received (timeout). Save not acknowledged."); }
-  finally{ modalSave.disabled = false; modalSave.textContent = prev; pendingSave = null; }
+    await performSaveWrite(editingFeature, enabledNow, sliderRaw);
+    if(editingFeature === 'beep'){ currentInitData.beep.enabled = enabledNow===1; currentInitData.beep.value = sliderRaw; }
+    else if(editingFeature === 'standby'){ currentInitData.standby.enabled = enabledNow===1; currentInitData.standby.value_mV = sliderRaw; }
+    else if(editingFeature === 'shutdown'){ currentInitData.shutdown.enabled = enabledNow===1; currentInitData.shutdown.value_mV = sliderRaw; }
+    else if(editingFeature === 'hiss'){ currentInitData.hiss.enabled = enabledNow===1; currentInitData.hiss.value_pct = sliderRaw; }
+    showInit(currentInitData);
+    modalBackdrop.style.display='none';
+    alert("Save acknowledged (INIT byte10=1).");
+  }catch(e){
+    console.warn("Save ACK error:", e);
+    alert("No response received (timeout). Save not acknowledged.");
+  }finally{
+    modalSave.disabled = false; modalSave.textContent = prevText; pendingSave = null;
+  }
 });
 
-/* gear buttons open modal */
-document.querySelectorAll('.gear').forEach(g=> g.addEventListener('click', async (ev)=>{
-  const f = g.dataset.feature;
-  if(currentInitData){ openFeatureModal(f); return; }
-  if(!writeChar) return alert("Not connected");
-  try{ await sendInitCmd(); await waitForNextInit(3000); openFeatureModal(f); } catch(e){ alert("Could not get INIT"); }
-}));
+/* gear wiring */
+document.querySelectorAll('.gear').forEach(g => {
+  g.addEventListener('click', async () => {
+    const feature = g.dataset.feature;
+    if (currentInitData) { openFeatureModal(feature); return; }
+    if (!writeChar) { alert("Not connected. Please connect before editing features."); return; }
+    try {
+      await sendInitCmd();
+      const initParsed = await waitForNextInit(3000);
+      openFeatureModal(feature);
+    } catch (err) {
+      console.warn("Failed to get INIT before opening modal:", err);
+      alert("Could not get INIT from device. Try sending INIT manually and try again.");
+    }
+  });
+});
 
-/* other UI wiring */
+/* UI wiring for other controls */
 connectButton.addEventListener('click', connect);
 disconnectButton.addEventListener('click', disconnect);
 sendLiveBtn.addEventListener('click', sendLiveCmd);
 sendInitBtn.addEventListener('click', sendInitCmd);
 startAutoBtn.addEventListener('click', startAutoLive);
 stopAutoBtn.addEventListener('click', stopAutoLive);
-clearRaw.addEventListener('click', ()=> recvRaw.innerHTML='');
-forceParse.addEventListener('click', ()=> { if(!lastPacket) return alert("No packet"); if(!isTagAt(lastPacket,6,"LIVE")) return alert("Latest not LIVE"); const p = parseLivePacket(lastPacket); if(p.error) alert(p.error); else showLive(p); });
-document.getElementById('copyParsed').addEventListener('click', async ()=> { await navigator.clipboard.writeText(`Battery: ${card_battery.textContent}\nCurrent: ${card_current_val.textContent}\nTemp: ${card_temp_value.textContent}`); alert("Copied"); });
-document.getElementById('copyInit').addEventListener('click', async ()=> { if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("Copied INIT"); });
+clearRaw.addEventListener('click', ()=> recvRaw.innerHTML = '');
+forceParse.addEventListener('click', ()=>{
+  if(!lastPacket) return alert("No packet available");
+  if(!isTagAt(lastPacket, 6, "LIVE")) return alert("Latest packet does not have 'LIVE' at bytes 6..9 — parsing skipped.");
+  if(lastPacket.length < 28) return alert("LIVE packet too short (need ≥28 bytes).");
+  const parsed = parseLivePacket(lastPacket);
+  if(parsed.error) alert(parsed.error); else showLive(parsed);
+});
+document.getElementById('copyParsed').addEventListener('click', async ()=>{
+  const lines = [
+    `Battery (V): ${card_battery.textContent}`,
+    `Current (mA): ${card_current_val.textContent}`,
+    `Temp (°C): ${card_temp_value.textContent}`,
+    `Min(kHz): ${card_minfreq_val.textContent}`,
+    `Max(kHz): ${card_maxfreq_val.textContent}`
+  ].join("\n");
+  await navigator.clipboard.writeText(lines); alert("LIVE parsed copied");
+});
+document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
-/* ==========================
-   NEW Waterfall implementation: history buffer + full redraw
-   - guaranteed vertical push-up movement
-   - serpentine sweep: fill a row L->R, push up, then R->L
-   - uses history array sized to canvas pixel height / ROW_H
-   ========================== */
+/* =============================
+   NEW: Waterfall with horizontal oscillation (history redraw)
+   ============================= */
 (function SerpentineWaterfall(){
   const canvas = wfCanvas;
   const ctx = canvas.getContext('2d', { alpha:false });
   const dpr = window.devicePixelRatio || 1;
 
-  let bins = parseInt(wfBinsSlider.value,10) || 100;
+  // parameters
+  let bins = parseInt(wfBinsSlider.value,10) || 46;
   let min_khz = 20.0, max_khz = 60.0, ppm = 1;
-  const ROW_H = 1; // css pixels per row
+  const ROW_H = 1; // one CSS pixel per history row
   const SIGMA = 2.2;
   const NOISE = 18;
   const MIN_STEP_MS = 4;
   const MAX_STEP_MS = 2000;
 
-  // dynamic canvas values (CSS px)
+  // canvas / geometry
   let widthCss = Math.max(200, Math.floor(canvas.clientWidth));
   let heightCss = Math.max(80, Math.floor(canvas.clientHeight));
-  let maxRows = Math.max(8, Math.floor(heightCss / ROW_H));
   let binWidth = widthCss / bins;
+  let maxRows = Math.max(4, Math.floor(heightCss / ROW_H));
   let binFreqsHz = new Float32Array(bins);
 
-  // history: newest row at index 0, older rows increase index
-  let history = []; // array of Uint8ClampedArray length=bins
-  function computeBinFreqs(){ const minHz = min_khz*1000, maxHz = max_khz*1000; binFreqsHz = new Float32Array(bins); for(let i=0;i<bins;i++){ const t = i/(bins-1); binFreqsHz[i] = minHz + t*(maxHz - minHz); } }
+  // history buffer: newest row at history[0], oldest at end
+  let history = [];
 
-  // serpentine sweep state
-  let direction = 1; // 1 L->R, -1 R->L
+  // sweep state
+  let direction = 1; // 1 left->right, -1 right->left
   let currentRow = new Uint8ClampedArray(bins);
   let currentIndex = 0;
   let started = false;
   let stepMs = 120;
   let lastTime = performance.now();
   let acc = 0;
+  let globalStepCounter = 0; // used to generate oscillation phase
 
   function resizeCanvas(){
     widthCss = Math.max(200, Math.floor(canvas.clientWidth));
     heightCss = Math.max(80, Math.floor(canvas.clientHeight));
     canvas.width = widthCss * dpr;
     canvas.height = heightCss * dpr;
-    // use css coordinate system for drawing (so we can reason in CSS px)
     ctx.setTransform(dpr,0,0,dpr,0,0);
     binWidth = widthCss / bins;
     maxRows = Math.max(4, Math.floor(heightCss / ROW_H));
-    // clear
-    ctx.fillStyle = "#031025";
-    ctx.fillRect(0,0,widthCss,heightCss);
-    // clamp history to maxRows
     if(history.length > maxRows) history.length = maxRows;
+    redrawAll();
   }
-  window.addEventListener('resize', ()=> { resizeCanvas(); redrawAll(); });
+  window.addEventListener('resize', ()=> resizeCanvas());
+
+  function computeBinFreqs(){
+    const minHz = min_khz * 1000.0;
+    const maxHz = max_khz * 1000.0;
+    binFreqsHz = new Float32Array(bins);
+    for(let i=0;i<bins;i++){
+      const t = i/(bins-1);
+      binFreqsHz[i] = minHz + t * (maxHz - minHz);
+    }
+  }
+  computeBinFreqs();
 
   function resetSweep(){
     currentRow = new Uint8ClampedArray(bins);
     direction = 1;
-    currentIndex = direction === 1 ? 0 : bins-1;
+    currentIndex = direction === 1 ? 0 : (bins - 1);
   }
 
   function clearAll(){
@@ -602,78 +768,93 @@ document.getElementById('copyInit').addEventListener('click', async ()=> { if(!c
 
   function ppmToMs(ppmVal){
     const stepsPerCycle = 2 * bins;
-    const periodSec = 60.0 / Math.max(1e-6, ppmVal);
-    let ms = (periodSec / stepsPerCycle) * 1000.0;
+    const periodSeconds = 60.0 / Math.max(1e-6, ppmVal);
+    let ms = (periodSeconds / stepsPerCycle) * 1000.0;
     ms = Math.max(MIN_STEP_MS, Math.min(MAX_STEP_MS, Math.round(ms)));
     return ms;
   }
 
-  function intensityForBin(binIdx, activeIdx){
+  // intensity around a shifted center (center can be offset for oscillation)
+  function intensityForBin(binIdx, centerIdx, peakGain=240){
     const denom = 2 * SIGMA * SIGMA;
-    const d = binIdx - activeIdx;
+    const d = binIdx - centerIdx;
     const g = Math.exp(-(d*d)/denom);
-    let val = Math.round(240 * g + (Math.random()*NOISE));
+    let val = Math.round(peakGain * g + (Math.random()*NOISE));
     if(val < 6) val = 0;
     return Math.min(255, val);
   }
 
-  function colorForIntensity(t){
-    const hue = 220 - (220 * t);
-    const sat = 95;
-    const light = Math.round(18 + 30 * t);
-    return `hsl(${Math.round(hue)}, ${sat}%, ${light}%)`;
+  // color mapping: vary hue slightly by distance from center and noise so oscillation shows
+  function colorForIntensityAndDist(intensity, dist){
+    const t = Math.max(0, Math.min(1, intensity / 255.0));
+    // base hue mapped to intensity (blue->red)
+    const baseHue = 220 - (220 * t);
+    // shift hue a little by dist so left/right have hue variation
+    const distShift = Math.max(-20, Math.min(20, -dist * 3));
+    const hue = Math.round(baseHue + distShift);
+    const sat = 92;
+    const light = Math.round(16 + 40 * (0.2 + 0.8 * t));
+    return `hsl(${hue}, ${sat}%, ${light}%)`;
   }
 
-  // redraw the entire canvas from history (time upward)
+  // redraw everything from history, newest row is history[0] -> bottom
   function redrawAll(){
     ctx.fillStyle = "#031025";
     ctx.fillRect(0,0,widthCss,heightCss);
-    // history[0] = newest row (bottom), history[history.length-1] oldest (top)
     for(let r=0;r<history.length;r++){
       const row = history[r];
-      // y position for this row: bottom-most = heightCss - ROW_H*(r+1)
       const y = heightCss - ROW_H * (r + 1);
       for(let b=0;b<bins;b++){
         const intensity = row[b];
         if(intensity <= 0) continue;
-        const t = intensity / 255.0;
-        ctx.fillStyle = colorForIntensity(t);
+        // compute distance to center for color shift: approximate nearest nonzero center by using row peak
+        // For simplicity: treat dist = (b - peakIndex) where peakIndex found via row's max
+        ctx.fillStyle = colorForIntensityAndDist(intensity, 0);
         const x = Math.floor(b * binWidth);
         ctx.fillRect(x, y, Math.ceil(binWidth), ROW_H);
       }
     }
-    // draw the current (in-progress) bottom row overlay (not yet pushed)
-    const y = heightCss - ROW_H;
+    // draw currentRow progress at bottom
+    const yCur = heightCss - ROW_H;
     for(let b=0;b<bins;b++){
-      const val = currentRow[b];
-      if(val <= 0) continue;
-      ctx.fillStyle = colorForIntensity(val/255);
+      const intensity = currentRow[b];
+      if(intensity <= 0) continue;
+      // For currentRow we compute small dist vs active center to vary hue
+      ctx.fillStyle = colorForIntensityAndDist(intensity, 0);
       const x = Math.floor(b * binWidth);
-      ctx.fillRect(x, y, Math.ceil(binWidth), ROW_H);
+      ctx.fillRect(x, yCur, Math.ceil(binWidth), ROW_H);
     }
   }
 
-  // each time a sweep completes we push `currentRow` into history and redraw
+  // push completed row into history (newest at start)
   function pushCurrentRow(){
-    // insert at beginning so newest at index 0
     history.unshift(currentRow);
     if(history.length > maxRows) history.pop();
-    // prepare new row
+    // create new row buffer and reverse
     currentRow = new Uint8ClampedArray(bins);
-    // reverse direction and set next starting index
     direction = -direction;
     currentIndex = direction === 1 ? 0 : (bins - 1);
-    // redraw
+    // draw
     redrawAll();
   }
 
-  function drawProgressCursor(idx){
-    // overlay currentRow plus a bright cursor
-    redrawAll(); // redraw includes currentRow
-    // draw cursor highlight bright at idx
+  // the wobble generator: returns integer offset in bins
+  function wobbleOffset(stepCounter, bins){
+    // amplitude proportional to bins but small (clamped)
+    const maxAmp = Math.max(1, Math.min(6, Math.round(bins * 0.04))); // ~4% of bins, clamped 1..6
+    // slower oscillation frequency, use sin + small random jitter
+    const phase = stepCounter * 0.25; // tune multiplier for visual effect
+    const osc = Math.sin(phase) * maxAmp;
+    // add small random jitter
+    const jitter = (Math.random() - 0.5) * 1.8;
+    return Math.round(osc + jitter);
+  }
+
+  // draw a highlighted cursor (optional)
+  function drawCursorAt(idx){
     const y = heightCss - ROW_H;
     const x = Math.floor(idx * binWidth);
-    ctx.fillStyle = "rgba(255,220,80,0.95)";
+    ctx.fillStyle = "rgba(255,255,255,0.02)"; // faint
     ctx.fillRect(x, y, Math.ceil(binWidth), ROW_H);
   }
 
@@ -682,46 +863,63 @@ document.getElementById('copyInit').addEventListener('click', async ()=> { if(!c
     const dt = now - lastTime; lastTime = now;
     acc += dt;
     while(acc >= stepMs){
-      // fill currentIndex
-      const val = intensityForBin(currentIndex, currentIndex);
-      currentRow[currentIndex] = val;
-      // move index
-      currentIndex += direction;
-      // detect sweep completion (index gone outside bounds)
-      if(currentIndex < 0 || currentIndex >= bins){
-        // sweep finished: push row (note currentRow is full)
-        pushCurrentRow();
-      } else {
-        // show movement while still filling
-        drawProgressCursor(currentIndex - direction); // show the bin just written
+      // compute wobble offset for this global step
+      const wobble = wobbleOffset(globalStepCounter++, bins);
+
+      // compute active center = currentIndex shifted by wobble but clamp inside bins
+      let center = currentIndex + wobble;
+      if(center < 0) center = 0;
+      if(center >= bins) center = bins - 1;
+
+      // fill currentIndex position using intensity function centered at 'center'
+      // we write a small gaussian around that center (not just single pixel) so oscillation shows
+      for(let b = Math.max(0, center - 6); b <= Math.min(bins - 1, center + 6); b++){
+        const dist = b - center;
+        // reduce peakGain a little depending on how far we are into the sweep for variety
+        const peakGain = 240 - Math.abs(Math.round(Math.sin(globalStepCounter*0.13)*20));
+        const val = intensityForBin(b, center, peakGain);
+        // pick the maximum so multiple writes while building row don't overwrite stronger values
+        currentRow[b] = Math.max(currentRow[b] || 0, val);
       }
+
+      // draw a preview of currentRow (progress)
+      redrawAll();
+      drawCursorAt(currentIndex);
+
+      // advance currentIndex
+      currentIndex += direction;
+
+      // if sweep done (index moved outside), push currentRow
+      if(currentIndex < 0 || currentIndex >= bins){
+        pushCurrentRow();
+      }
+
       acc -= stepMs;
     }
     requestAnimationFrame(loop);
   }
 
   function updateFromLive(minK, maxK, ppmVal){
-    // set params
     min_khz = minK || min_khz;
     max_khz = maxK || max_khz;
     ppm = (ppmVal && ppmVal > 0) ? ppmVal : ppm;
     computeBinFreqs();
-    // compute step time
+    // compute ms per step so one full cycle (min->max->min) happens ppm times per minute:
     stepMs = ppmToMs(ppm);
-    // if not started, initialize
+    binWidth = widthCss / bins;
+    wfRangeEl.textContent = `Range: ${min_khz.toFixed(2)}–${max_khz.toFixed(2)} kHz`;
+    wfBinsLabel.textContent = String(bins);
+
     if(!started){
       started = true;
       resizeCanvas();
-      resetSweep();
       history = [];
+      resetSweep();
       lastTime = performance.now();
       acc = 0;
       requestAnimationFrame(loop);
     }
-    // redraw overlay labels
-    wfRangeEl.textContent = `Range: ${min_khz.toFixed(2)}–${max_khz.toFixed(2)} kHz`;
-    wfBinsLabel.textContent = String(bins);
-    console.log(`Waterfall update: min=${min_khz} max=${max_khz} ppm=${ppm} stepMs=${stepMs} bins=${bins}`);
+    console.log(`Waterfall started/updated: min=${min_khz}kHz max=${max_khz}kHz ppm=${ppm} stepMs=${stepMs} bins=${bins}`);
   }
 
   function setBins(n){
@@ -730,34 +928,39 @@ document.getElementById('copyInit').addEventListener('click', async ()=> { if(!c
     bins = n;
     binWidth = widthCss / bins;
     computeBinFreqs();
-    // reset sweep and history
+    // reset history / sweep
     history = [];
     currentRow = new Uint8ClampedArray(bins);
-    currentIndex = 0;
-    direction = 1;
+    direction = 1; currentIndex = 0;
     stepMs = ppmToMs(ppm);
     redrawAll();
   }
 
   function ppmToMs(ppmVal){
     const stepsPerCycle = 2 * bins;
-    const periodSec = 60.0 / Math.max(1e-6, ppmVal);
-    let ms = (periodSec / stepsPerCycle) * 1000.0;
+    const periodSeconds = 60.0 / Math.max(1e-6, ppmVal);
+    let ms = (periodSeconds / stepsPerCycle) * 1000.0;
     ms = Math.max(MIN_STEP_MS, Math.min(MAX_STEP_MS, Math.round(ms)));
     return ms;
   }
 
   // wire bins slider
-  wfBinsSlider.addEventListener('input', ()=>{ const n = parseInt(wfBinsSlider.value,10); wfBinsLabel.textContent = String(n); setBins(n); });
+  wfBinsSlider.addEventListener('input', ()=> {
+    const n = parseInt(wfBinsSlider.value,10);
+    wfBinsLabel.textContent = String(n);
+    setBins(n);
+  });
 
-  // expose API
+  // expose
   window.SerpentineWaterfall = { updateFromLive, setBins };
 
-  // init resize + compute
-  resizeCanvas(); computeBinFreqs(); resetSweep(); redrawAll();
-})(); // end waterfall module
+  // initial setup
+  resizeCanvas();
+  computeBinFreqs();
+  redrawAll();
+})();
 
-/* final checks */
+/* initial checks */
 if(!navigator.bluetooth){
   alert("Web Bluetooth not available in this browser.");
   connectButton.disabled = true;

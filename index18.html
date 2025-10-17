@@ -47,7 +47,7 @@
   .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:8px 12px;border-radius:10px;cursor:pointer}
   .badge { display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.02); font-weight:700; color:var(--muted); font-size:13px }
 
-  .icon { width:32px; height:32px; display:inline-block; vertical-align:middle; }
+  .icon { width:40px; height:40px; display:inline-block; vertical-align:middle; }
   svg.icon path, svg.icon rect, svg.icon circle { stroke: var(--icon-yellow); stroke-width:1.6; fill: none; }
   svg.icon rect.filled { fill: var(--icon-yellow); stroke: none; }
 
@@ -411,10 +411,10 @@
   </div>
 
 <script>
-/* ============================
-   BLE + UI + parsing (unchanged)
-   Waterfall updated to true sweep driven by waveVal (ppm)
-   ============================ */
+/* Full app: BLE + parsing + modal + save ACK + UI + enhanced waterfall
+   Important: This file intentionally preserves the BLE logic and IDs
+   while replacing the waterfall implementation with a smoother scrolling version.
+*/
 
 /* UUIDs & frames */
 const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
@@ -495,7 +495,6 @@ const modalTitle = document.getElementById('modalTitle');
 /* waterfall refs */
 const waterfallCanvas = document.getElementById('waterfallCanvas');
 const wfInfo = document.getElementById('wfInfo');
-const wfCtx = waterfallCanvas.getContext('2d');
 
 /* state */
 let device, server, notifyChar, writeChar;
@@ -511,18 +510,7 @@ let pendingSave = null;
 /* awaitingInitPromise used when gear pressed and we need to request INIT and wait for it */
 let awaitingInitPromise = null;
 
-/* Waterfall state */
-const WF_BINS = 100;          // 100 data points between min & max
-const WF_ROWS = 160;          // history rows (visual depth)
-let wfBuffer = [];            // array of rows (each row = Uint8Array length WF_BINS)
-let wfBinValues = new Float32Array(WF_BINS); // nominal bin freqs (Hz)
-let wfStep = 0;               // current step in cycle
-let wfDirection = 1;          // derived from step math, not used directly now
-let wfTimer = null;          // interval id
-let wfLastPpm = 1;          // last observed ppm (waveVal)
-const SIGMA = 3.0;          // gaussian spread (bins) around active bin
-
-/* helpers */
+/* helper functions */
 function hexToBytes(hexStr){
   const cleaned = hexStr.replace(/0x/g,"").replace(/[^A-Fa-f0-9]/g,"");
   const out = new Uint8Array(cleaned.length/2);
@@ -580,11 +568,17 @@ function showLive(obj){
   card_days.textContent = (obj.days != null) ? obj.days.toString() + " Days" : "-- Days";
   card_hhmmss.textContent = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "--:--:--";
 
-  // update waterfall (min/max/ppm)
-  updateWaterfallParamsFromLive(obj);
+  // Update waterfall with numeric values
+  const min_khz = (obj.min_Hz != null) ? (obj.min_Hz/1000.0) : (parseFloat(card_minfreq.textContent) || 1.0);
+  const max_khz = (obj.max_Hz != null) ? (obj.max_Hz/1000.0) : (parseFloat(card_maxfreq.textContent) || 20.0);
+  const ppm = (obj.waveVal != null) ? obj.waveVal : parseInt(card_waveval.textContent) || 1;
+
+  if(window.enhancedWaterfall && typeof window.enhancedWaterfall.updateFromLive === 'function'){
+    window.enhancedWaterfall.updateFromLive(min_khz, max_khz, ppm);
+  }
 }
 
-/* INIT parsing & display (unchanged) */
+/* INIT parsing & display */
 function parseInitPacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 51) return { error:"INIT too short" };
@@ -663,7 +657,7 @@ async function writeFrame(bytes, label){
 async function sendLiveCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(LIVE_CMD_HEX); await writeFrame(d, "LIVE"); }
 async function sendInitCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(INIT_CMD_HEX); await writeFrame(d, "INIT"); }
 
-/* Connect / disconnect (preserve existing logic) */
+/* Connect / disconnect */
 async function connect() {
   console.log("Connect button clicked");
   if (!navigator.bluetooth) {
@@ -730,7 +724,7 @@ async function disconnect() {
   onDeviceDisconnected();
 }
 
-/* Handle notifications, resolve waiting promises and update UI */
+/* Handle notifications */
 function onNotify(ev){
   const arr = new Uint8Array(ev.target.value.buffer);
 
@@ -832,7 +826,7 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   return waitForInitAck(featureKey, sliderRaw, 5000);
 }
 
-/* modal helpers (unchanged) */
+/* modal helpers */
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
@@ -887,7 +881,7 @@ modalClose.addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', (ev)=>{ if(ev.target === modalBackdrop) closeModal(); });
 function closeModal(){ modalBackdrop.style.display = 'none'; editingFeature = null; }
 
-/* modal save (unchanged) */
+/* modal save */
 modalSave.addEventListener('click', async ()=>{
   if(!editingFeature || !currentInitData){ closeModal(); return; }
   if(!writeChar) { alert("Not connected — can't send save command"); return; }
@@ -914,7 +908,7 @@ modalSave.addEventListener('click', async ()=>{
   }
 });
 
-/* gear button wiring (unchanged) */
+/* gear button wiring */
 document.querySelectorAll('.gear').forEach(g => {
   g.addEventListener('click', async () => {
     const feature = g.dataset.feature;
@@ -931,7 +925,7 @@ document.querySelectorAll('.gear').forEach(g => {
   });
 });
 
-/* UI wiring for other controls (unchanged) */
+/* UI wiring for other controls */
 connectButton.addEventListener('click', connect);
 disconnectButton.addEventListener('click', disconnect);
 sendLiveBtn.addEventListener('click', sendLiveCmd);
@@ -959,164 +953,160 @@ document.getElementById('copyParsed').addEventListener('click', async ()=>{
 document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
 /* =========================
-   Waterfall implementation (improved)
-   - 100 bins between min & max
-   - gaussian spread per row
-   - active index sweeps min->max->min
-   - speed governed by waveVal (ppm)
+   Enhanced Waterfall module
+   - smooth scrolling canvas
+   - 100 bins between min/max
+   - sweep min->max->min
+   - timing derived from waveVal as ppm
+   - uses requestAnimationFrame + accumulator for precise timing
    ========================= */
 
-function initWFBuffers(){
-  wfBuffer = [];
-  for(let r=0;r<WF_ROWS;r++) wfBuffer.push(new Uint8Array(WF_BINS));
-  wfStep = 0;
-  wfLastPpm = 1;
-  computeBinFreqs(1.0, 20.0); // defaults
-  wfInfo.textContent = `bins:${WF_BINS}`;
-  drawWaterfall(); // initial
-}
+(function initEnhancedWaterfall(){
+  const WF_BINS = 100;
+  const MIN_STEP_MS = 4;
+  const MAX_STEP_MS = 2000;
+  const GAUSSIAN_SIGMA = 3.0;
 
-/* compute bin nominal freqs (Hz) */
-function computeBinFreqs(min_khz, max_khz){
-  const minHz = min_khz * 1000;
-  const maxHz = max_khz * 1000;
-  for(let i=0;i<WF_BINS;i++){
-    const t = i / (WF_BINS - 1);
-    wfBinValues[i] = minHz + t * (maxHz - minHz);
-  }
-}
-
-/* parse displayed kHz like "17.4 kHz" -> numeric value in kHz */
-function parseDisplayedKHz(str){
-  if(!str) return null;
-  const m = str.match(/([0-9.+-eE]+)/);
-  if(!m) return null;
-  return parseFloat(m[1]);
-}
-
-/* update waterfall params when LIVE arrives */
-function updateWaterfallParamsFromLive(liveObj){
-  const min_khz = parseDisplayedKHz(card_minfreq.textContent) || 1.0;
-  const max_khz = parseDisplayedKHz(card_maxfreq.textContent) || 20.0;
-  const ppm = (liveObj.waveVal != null && liveObj.waveVal > 0) ? liveObj.waveVal : (wfLastPpm || 1);
-
-  computeBinFreqs(min_khz, max_khz);
-  wfLastPpm = ppm;
-  // compute step timing precisely:
-  // forwardSteps = WF_BINS - 1
-  // stepsPerCycle = 2 * forwardSteps  (min->max->min)
-  const forwardSteps = WF_BINS - 1;
-  const stepsPerCycle = 2 * forwardSteps;
-  const periodSeconds = 60.0 / Math.max(0.0001, ppm); // seconds per full cycle
-  let stepIntervalMs = (periodSeconds / stepsPerCycle) * 1000.0;
-  // clamp to sensible range
-  stepIntervalMs = Math.max(6, Math.min(2000, Math.round(stepIntervalMs)));
-
-  wfInfo.textContent = `bins:${WF_BINS} ${min_khz.toFixed(2)}–${max_khz.toFixed(2)} kHz | ppm:${ppm} | step:${stepIntervalMs}ms`;
-
-  restartWFTimer(stepIntervalMs);
-}
-
-/* create a gaussian row centered at activeBin */
-function makeRowForBin(activeBin){
-  const row = new Uint8Array(WF_BINS);
-  for(let b=0;b<WF_BINS;b++){
-    const d = Math.abs(b - activeBin);
-    // gaussian falloff
-    const intensity = Math.exp( - (d * d) / (2 * SIGMA * SIGMA) );
-    let val = Math.round(255 * intensity);
-    // add tiny noise
-    val = Math.min(255, val + Math.round(Math.random()*12));
-    if(val < 6) val = 0;
-    row[b] = val;
-  }
-  return row;
-}
-
-/* push new row (scrolled at bottom) */
-function pushRow(row){
-  wfBuffer.push(row);
-  if(wfBuffer.length > WF_ROWS) wfBuffer.shift();
-}
-
-/* draw the waterfall */
-function drawWaterfall(){
   const canvas = waterfallCanvas;
-  const cw = canvas.width;
-  const ch = canvas.height;
-  wfCtx.clearRect(0,0,cw,ch);
-  // fill background
-  wfCtx.fillStyle = "#04121a";
-  wfCtx.fillRect(0,0,cw,ch);
+  const ctx = canvas.getContext('2d');
+  const wfInfoEl = wfInfo;
+  let bins = WF_BINS;
+  let binFreqs = new Float32Array(bins);
+  let stepIntervalMs = 150;
+  let lastTime = performance.now();
+  let acc = 0;
+  let stepCounter = 0;
+  let running = true;
 
-  const rowHeight = ch / WF_ROWS;
-  const binWidth = cw / WF_BINS;
+  // DPI handling
+  function resizeCanvas(){
+    const cssW = Math.floor(canvas.clientWidth);
+    const cssH = Math.floor(canvas.clientHeight);
+    const dpr = window.devicePixelRatio || 1;
+    if(canvas.width !== cssW * dpr || canvas.height !== cssH * dpr){
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+  }
+  resizeCanvas();
+  window.addEventListener('resize', ()=> { resizeCanvas(); drawPlaceholder(); });
 
-  // draw from oldest (top) to newest (bottom)
-  for(let r=0;r<wfBuffer.length;r++){
-    const row = wfBuffer[r];
-    const y = r * rowHeight;
-    for(let b=0;b<WF_BINS;b++){
-      const intensity = row[b]; // 0..255
-      if(intensity <= 0) continue;
-      // color map: blue->cyan->yellowish
-      const t = intensity / 255.0;
-      // palette mixing
-      const rC = Math.round(10 + t*245); // brighten with t
-      const gC = Math.round(30 + t*220);
-      const bC = Math.round(80 - t*40);
-      wfCtx.fillStyle = `rgb(${rC},${gC},${bC})`;
-      wfCtx.fillRect(Math.floor(b*binWidth), Math.floor(y), Math.ceil(binWidth), Math.ceil(rowHeight));
+  function drawPlaceholder(){
+    resizeCanvas();
+    ctx.fillStyle = "#04121a";
+    ctx.fillRect(0,0,canvas.clientWidth, canvas.clientHeight);
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    ctx.font = "11px Arial";
+    ctx.fillText("Waterfall", 8, 16);
+  }
+  drawPlaceholder();
+
+  function computeBins(min_khz, max_khz){
+    const minHz = min_khz*1000, maxHz = max_khz*1000;
+    for(let i=0;i<bins;i++){
+      const t = i/(bins-1);
+      binFreqs[i] = minHz + t*(maxHz-minHz);
     }
   }
 
-  // add a faint axis label for min/max
-  wfCtx.fillStyle = "rgba(255,255,255,0.08)";
-  wfCtx.font = "11px Arial";
-  wfCtx.fillText("Min", 6, ch - 6);
-  wfCtx.fillText("Max", cw - 34, ch - 6);
-}
+  function ppmToMs(ppm){
+    const forward = bins - 1;
+    const stepsPerCycle = 2 * forward;
+    const period = 60.0 / Math.max(1e-6, ppm);
+    let ms = (period / stepsPerCycle) * 1000.0;
+    ms = Math.max(MIN_STEP_MS, Math.min(MAX_STEP_MS, Math.round(ms)));
+    return ms;
+  }
 
-/* compute active bin index for step value (0..stepsPerCycle-1)
-   mapping produces forward sweep then backward sweep */
-function activeBinForStep(step){
-  const forwardSteps = WF_BINS - 1;
-  const stepsPerCycle = 2 * forwardSteps;
-  const s = step % stepsPerCycle;
-  if(s <= forwardSteps){
-    // forward (0 .. forwardSteps)
-    return s;
-  } else {
-    // backward (forwardSteps-1 down to 1)
+  function activeBinForStep(st){
+    const forward = bins - 1;
+    const stepsPerCycle = 2 * forward;
+    const s = st % stepsPerCycle;
+    if(s <= forward) return s;
     return stepsPerCycle - s;
   }
-}
 
-/* single step tick for animation */
-function waterfallTick(){
-  const forwardSteps = WF_BINS - 1;
-  const stepsPerCycle = 2 * forwardSteps;
-  // compute active bin
-  const activeBin = activeBinForStep(wfStep);
-  // create row and push
-  const row = makeRowForBin(activeBin);
-  pushRow(row);
-  drawWaterfall();
-  // advance step
-  wfStep = (wfStep + 1) % stepsPerCycle;
-}
+  function makeRow(activeBin){
+    const row = new Uint8ClampedArray(bins);
+    const denom = 2 * GAUSSIAN_SIGMA * GAUSSIAN_SIGMA;
+    for(let b=0;b<bins;b++){
+      const d = b - activeBin;
+      const g = Math.exp(-(d*d)/denom);
+      let val = Math.min(255, Math.round(220*g + Math.random()*35));
+      if(val < 6) val = 0;
+      row[b] = val;
+    }
+    return row;
+  }
 
-/* manage timer */
-function restartWFTimer(stepMs){
-  // clear previous
-  if(wfTimer) { clearInterval(wfTimer); wfTimer = null; }
-  // schedule new
-  wfTimer = setInterval(waterfallTick, stepMs);
-}
+  function pushRow(row){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    // scroll up by 1 px
+    ctx.drawImage(canvas, 0, 1, w, h-1, 0, 0, w, h-1);
+    const binW = w / bins;
+    for(let b=0;b<bins;b++){
+      const intensity = row[b];
+      if(intensity <= 0) continue;
+      const t = intensity/255;
+      const r = Math.round(8 + t*240);
+      const g = Math.round(24 + t*220);
+      const bl = Math.round(80 - t*40);
+      ctx.fillStyle = `rgb(${r},${g},${bl})`;
+      const x = Math.floor(b*binW);
+      ctx.fillRect(x, h-1, Math.ceil(binW), 1);
+    }
+  }
 
-/* initialize waterfall */
-initWFBuffers();
-restartWFTimer(150);
+  function drawOverlay(){
+    ctx.fillStyle = "rgba(255,255,255,0.03)";
+    ctx.fillRect(0,0,110,20);
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = "11px Arial";
+    ctx.fillText(`bins:${bins}`, 6, 13);
+  }
+
+  // main loop
+  function loop(now){
+    if(!running) return;
+    const dt = now - lastTime;
+    lastTime = now;
+    acc += dt;
+    while(acc >= stepIntervalMs){
+      const active = activeBinForStep(stepCounter);
+      const row = makeRow(active);
+      pushRow(row);
+      stepCounter = (stepCounter + 1) % (2*(bins - 1));
+      acc -= stepIntervalMs;
+    }
+    drawOverlay();
+    requestAnimationFrame(loop);
+  }
+
+  // public API
+  function updateFromLive(min_khz, max_khz, ppm){
+    computeBins(min_khz, max_khz);
+    const ms = ppmToMs(Math.max(0.0001, ppm || 1));
+    stepIntervalMs = ms;
+    wfInfo.textContent = `min:${min_khz.toFixed(2)}kHz max:${max_khz.toFixed(2)}kHz ppm:${ppm} step:${stepIntervalMs}ms`;
+  }
+
+  function start(){
+    drawPlaceholder();
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  // expose
+  window.enhancedWaterfall = {
+    updateFromLive,
+    start
+  };
+
+  // bootstrap
+  start();
+
+})();
 
 /* initial checks */
 if(!navigator.bluetooth){

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>CARCAT 5G — Dashboard (BLE + Radio-style Waterfall)</title>
+<title>CARCAT 5G — Dashboard (BLE + Waterfall)</title>
 <style>
   :root{
     --bg: #0b0f14;
@@ -36,6 +36,7 @@
   .wfBlue{background:#2b7bff;padding:8px 12px;border-radius:8px;color:white;font-weight:800}
   .wfGreen{background:#16a34a;padding:8px 12px;border-radius:8px;color:white;font-weight:700}
   .footer{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+  input[type="range"]{width:140px}
   @media (max-width:980px){.wrap{grid-template-columns:1fr;padding:12px}.grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -134,19 +135,22 @@
           <div class="muted">Controls waterfall sweep speed</div>
         </div>
 
-        <!-- Waterfall tile -->
+        <!-- Waterfall tile (grid-column full width) -->
         <div class="tile" id="card_waterfall" style="grid-column:1/-1;border-left:6px solid #0ea5e9">
           <div class="heading"><div>Visualization (Waterfall)</div><div class="muted">Radio-style waterfall</div></div>
           <div class="wfTopBar">
             <div class="wfBlue" id="wfCurrentFreq">-- kHz</div>
-            <div class="wfGreen" id="wfStep">Step: --/100</div>
+            <div class="wfGreen" id="wfStep">Step: --/--</div>
             <div class="muted" id="wfRange">Range: -- kHz</div>
+            <div style="margin-left:12px" class="muted">Bins</div>
+            <input id="wfBinsSlider" type="range" min="10" max="100" value="100">
+            <div class="badge" id="wfBinsLabel">100</div>
           </div>
           <canvas id="waterfallCanvas" style="width:100%;height:240px;background:#041028;border-radius:8px;display:block"></canvas>
           <div style="margin-top:8px" class="muted">Time → upward • Intensity: blue (weak) → red (strong)</div>
         </div>
 
-        <!-- Feature cards -->
+        <!-- Feature cards (unchanged layout) -->
         <div class="tile" id="feat_beep_card" style="border-left:6px solid #ff6fa6">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div><div style="font-weight:800">Audible beep</div><div class="muted">Duration (after every)</div></div>
@@ -208,7 +212,7 @@
     </div>
   </div>
 
-  <!-- Modal (unchanged structure) -->
+  <!-- Modal (unchanged minimal) -->
   <div id="modalBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:2000">
     <div style="width:420px;background:#f6fbff;padding:16px;border-radius:10px;color:#0b1220">
       <div style="text-align:right"><span id="modalClose" style="cursor:pointer">✕</span></div>
@@ -231,9 +235,7 @@
   </div>
 
 <script>
-/* === BLE, parsing, modal, save ACK logic preserved ===
-   I only replaced the waterfall with a WaterfallChart component that renders like SWL radio waterfalls.
-*/
+/* === Full app: BLE + parsing + modal + save ACK + waterfall (updated) === */
 
 /* UUIDs & frames */
 const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
@@ -310,6 +312,8 @@ const wfCurrentFreq = document.getElementById('wfCurrentFreq');
 const wfStepEl = document.getElementById('wfStep');
 const wfRangeEl = document.getElementById('wfRange');
 const wfCanvas = document.getElementById('waterfallCanvas');
+const wfBinsSlider = document.getElementById('wfBinsSlider');
+const wfBinsLabel = document.getElementById('wfBinsLabel');
 
 /* state */
 let device, server, notifyChar, writeChar;
@@ -318,12 +322,10 @@ let currentInitData = null;
 let autoIntervalId = null;
 let writeInProgress = false;
 let editingFeature = null;
-
-/* save ACK handling */
 let pendingSave = null;
 let awaitingInitPromise = null;
 
-/* util helpers */
+/* helper utils */
 function hexToBytes(hexStr){
   const cleaned = hexStr.replace(/0x/g,"").replace(/[^A-Fa-f0-9]/g,"");
   const out = new Uint8Array(cleaned.length/2);
@@ -345,20 +347,17 @@ function readU8(buf, idx){ return (idx < buf.length) ? buf[idx] : null; }
 function readU16le(buf, lo, hi){ const l=readU8(buf,lo), h=readU8(buf,hi); if(l===null||h===null) return null; return (h<<8) | l; }
 function isTagAt(buf, offset, tagStr){ if(!buf || buf.length < offset + tagStr.length) return false; for(let i=0;i<tagStr.length;i++) if(buf[offset+i] !== tagStr.charCodeAt(i)) return false; return true; }
 
-/* PARSERS */
+/* === LIVE/INIT parsers & UI updates (unchanged logic from previous) === */
 function parseLivePacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 28) return { error:"LIVE too short" };
   return {
     battery_mV: readU16le(buf,10,11),
-    current_mA: (() => {
-      const raw = readU16le(buf,12,13);
-      return (raw != null) ? (raw/1000) : null;
-    })(),
+    current_mA: (() => { const raw = readU16le(buf,12,13); return (raw != null) ? (raw/1000) : null; })(),
     temp_raw: readU16le(buf,14,15),
     min_Hz: readU16le(buf,16,17),
     max_Hz: readU16le(buf,18,19),
-    waveVal: readU16le(buf,20,21),  // ppm
+    waveVal: readU16le(buf,20,21),
     pattern: readU8(buf,22),
     days: readU16le(buf,23,24),
     hh: readU8(buf,25), mm: readU8(buf,26), ss: readU8(buf,27),
@@ -374,7 +373,7 @@ function showLive(obj){
   card_maxfreq_val.textContent = (obj.max_Hz != null) ? (obj.max_Hz/1000).toFixed(3) + " kHz" : "-- kHz";
   card_waveval.textContent = (obj.waveVal != null) ? obj.waveVal.toString() + " ppm" : "-- ppm";
 
-  // Update waterfall
+  // update waterfall: this will start the waterfall on first valid LIVE
   const min_khz = (obj.min_Hz != null) ? (obj.min_Hz/1000.0) : 20.0;
   const max_khz = (obj.max_Hz != null) ? (obj.max_Hz/1000.0) : 60.0;
   const ppm = (obj.waveVal != null && obj.waveVal > 0) ? obj.waveVal : 1;
@@ -383,7 +382,6 @@ function showLive(obj){
   }
 }
 
-/* INIT parsing & display */
 function parseInitPacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 51) return { error:"INIT too short" };
@@ -611,7 +609,7 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   return waitForInitAck(featureKey, sliderRaw, 5000);
 }
 
-/* modal logic (same as before) */
+/* modal logic (unchanged) */
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
@@ -736,83 +734,69 @@ document.getElementById('copyParsed').addEventListener('click', async ()=>{
 document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
 /* ============================
-   WaterfallChart: radio-style waterfall
-   - 100 horizontal bins
-   - time flows upward (new row at bottom)
-   - intensity color map: blue -> cyan -> green -> yellow -> red
-   - sweep (min->max->min) repeats 'ppm' times per minute (waveVal)
-   - draws 1-pixel rows for smooth waterfall (fast)
-   - shows current frequency + step indicator + range
+   WaterfallChart v2 (improved)
+   - starts only after updateFromLive called first time
+   - scrolls upward (time flows up) by copying canvas content up
+   - adjustable bins via slider (10..100)
+   - gaussian peak + noise, HSL color ramp
+   - robust handling of resizing and bins changes
    ============================ */
-
 (function WaterfallModule(){
   const canvas = wfCanvas;
   const ctx = canvas.getContext('2d', { alpha: false });
   const dpr = window.devicePixelRatio || 1;
 
-  // configuration
-  const BINS = 100;
-  const ROW_HEIGHT_PX = 1;        // 1px tall rows (classic waterfall)
+  let bins = parseInt(wfBinsSlider.value,10) || 100;
+  let min_khz = 20.0, max_khz = 60.0, ppm = 10;
+  const ROW_H = 1;               // row height in CSS pixels
+  const SIGMA = 2.2;
+  const NOISE_LEVEL = 18;
   const MIN_STEP_MS = 4;
   const MAX_STEP_MS = 2000;
-  const SIGMA = 2.2;             // gaussian spread in bins for the bright peak
-  const NOISE_LEVEL = 18;
 
-  // internal state
-  let bins = BINS;
-  let widthPx = 800, heightPx = 240;
+  let widthCss = 800, heightCss = 240;
   let binWidth = 1;
-  let stepIntervalMs = 120;
+  let binFreqsHz = new Float32Array(bins);
+  let started = false;           // don't animate until first updateFromLive
+  let stepMs = 150;
   let lastTime = performance.now();
   let acc = 0;
   let stepCounter = 0;
-  let running = true;
-  let min_khz = 20.0, max_khz = 60.0, ppm = 10;
-  let forwardSteps = bins - 1;
-  let stepsPerCycle = 2 * forwardSteps;
 
-  // high-dpi canvas resize
-  function resize(){
-    const cssW = Math.floor(canvas.clientWidth);
-    const cssH = Math.floor(canvas.clientHeight);
-    widthPx = cssW;
-    heightPx = cssH;
+  function resizeCanvas(){
+    const cssW = Math.floor(canvas.clientWidth) || 600;
+    const cssH = Math.floor(canvas.clientHeight) || 240;
+    widthCss = cssW; heightCss = cssH;
     canvas.width = cssW * dpr;
     canvas.height = cssH * dpr;
     ctx.setTransform(dpr,0,0,dpr,0,0);
-    binWidth = cssW / bins;
-    // draw background
+    binWidth = widthCss / bins;
+    // clear background
     ctx.fillStyle = "#031025";
-    ctx.fillRect(0,0,cssW,cssH);
+    ctx.fillRect(0,0,widthCss,heightCss);
   }
-  window.addEventListener('resize', resize);
-  resize();
+  window.addEventListener('resize', ()=> {
+    resizeCanvas();
+    // redraw clean slate
+  });
+  resizeCanvas();
 
-  // color map: use H (240->0), S=95%, L=40% roughly
-  function colorForIntensity(t){ // t: 0..1
-    const hue = 240 - (240 * t); // 240 blue -> 0 red
-    const sat = 95;
-    const light = Math.round(25 + 30 * t); // darker at low, brighter at high
-    return `hsl(${Math.round(hue)}, ${sat}%, ${light}%)`;
-  }
-
-  // compute bin frequencies (Hz) across bins
-  let binFreqsHz = new Float32Array(bins);
   function computeBinFreqs(){
     const minHz = min_khz * 1000.0;
     const maxHz = max_khz * 1000.0;
+    binFreqsHz = new Float32Array(bins);
     for(let i=0;i<bins;i++){
-      const t = i / (bins - 1);
-      binFreqsHz[i] = minHz + t * (maxHz - minHz);
+      const t = i/(bins-1);
+      binFreqsHz[i] = minHz + t*(maxHz - minHz);
     }
   }
   computeBinFreqs();
 
-  function ppmToStepMs(ppmVal){
+  function ppmToMs(ppmVal){
     const forward = bins - 1;
-    const steps = 2 * forward;
-    const periodSec = 60.0 / Math.max(1e-6, ppmVal);
-    let ms = (periodSec / steps) * 1000.0;
+    const stepsPerCycle = 2 * forward;
+    const periodSeconds = 60.0 / Math.max(1e-6, ppmVal);
+    let ms = (periodSeconds / stepsPerCycle) * 1000.0;
     ms = Math.max(MIN_STEP_MS, Math.min(MAX_STEP_MS, Math.round(ms)));
     return ms;
   }
@@ -825,7 +809,7 @@ document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!cu
     return steps - s;
   }
 
-  function makeRowForActive(activeBin){
+  function makeRow(activeBin){
     const row = new Uint8ClampedArray(bins);
     const denom = 2 * SIGMA * SIGMA;
     for(let b=0;b<bins;b++){
@@ -838,83 +822,112 @@ document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!cu
     return row;
   }
 
-  // draw one row at bottom and scroll existing upward by ROW_HEIGHT_PX
+  function colorForIntensity(t){
+    // t in [0..1], map to a pleasing blue->cyan->green->yellow->red
+    const hue = 220 - (220 * t); // 220 (blue) -> 0 (red approx)
+    const sat = 95;
+    const light = Math.round(18 + 30 * t);
+    return `hsl(${Math.round(hue)}, ${sat}%, ${light}%)`;
+  }
+
+  // scroll up using drawImage (fast) and draw new row at bottom
   function pushRow(row){
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
+    const w = widthCss, h = heightCss;
+    // scroll up by ROW_H pixels
+    // drawImage uses source and destination in CSS px because of transform set earlier
+    ctx.drawImage(canvas, 0, ROW_H, w, h - ROW_H, 0, 0, w, h - ROW_H);
+    // clear bottom line
+    ctx.fillStyle = "#031025";
+    ctx.fillRect(0, h - ROW_H, w, ROW_H);
 
-    // scroll up
-    ctx.drawImage(canvas, 0, ROW_HEIGHT_PX, w, h-ROW_HEIGHT_PX, 0, 0, w, h-ROW_HEIGHT_PX);
-
-    // draw new row at bottom (y = h - ROW_HEIGHT_PX .. h)
-    const y = h - ROW_HEIGHT_PX;
+    // draw row at bottom y = h-ROW_H
+    const y = h - ROW_H;
     for(let b=0;b<bins;b++){
-      const intensity = row[b]; // 0-255
+      const intensity = row[b];
       if(intensity <= 0) continue;
       const t = intensity / 255.0;
       ctx.fillStyle = colorForIntensity(t);
       const x = Math.floor(b * binWidth);
-      ctx.fillRect(x, y, Math.ceil(binWidth), ROW_HEIGHT_PX);
+      ctx.fillRect(x, y, Math.ceil(binWidth), ROW_H);
     }
   }
 
-  // overlay current freq and step info
   function drawOverlay(activeBin){
-    // current freq
     const freqHz = Math.round(binFreqsHz[activeBin] || 0);
     const freqk = (freqHz / 1000).toFixed(2);
     wfCurrentFreq.textContent = `${freqk} kHz`;
     wfStepEl.textContent = `Step: ${activeBin+1}/${bins}`;
     wfRangeEl.textContent = `Range: ${min_khz.toFixed(2)}–${max_khz.toFixed(2)} kHz`;
+    wfBinsLabel.textContent = String(bins);
   }
 
-  // main loop using requestAnimationFrame + accumulator to respect stepIntervalMs
   function loop(now){
-    if(!running) return;
+    if(!started) { requestAnimationFrame(loop); return; }
     const dt = now - lastTime;
     lastTime = now;
     acc += dt;
-    while(acc >= stepIntervalMs){
-      const activeBin = activeBinForStep(stepCounter);
-      const row = makeRowForActive(activeBin);
+    while(acc >= stepMs){
+      const active = activeBinForStep(stepCounter);
+      const row = makeRow(active);
       pushRow(row);
-      drawOverlay(activeBin);
-      stepCounter = (stepCounter + 1) % (2*(bins-1));
-      acc -= stepIntervalMs;
+      drawOverlay(active);
+      stepCounter = (stepCounter + 1) % (2*(bins - 1));
+      acc -= stepMs;
     }
     requestAnimationFrame(loop);
   }
 
-  // public API
+  // Public API
   function updateFromLive(minK, maxK, ppmVal){
+    // update parameters and start waterfall (if not started)
     min_khz = minK || min_khz;
     max_khz = maxK || max_khz;
-    ppm = (ppmVal && ppmVal > 0) ? ppmVal : 1;
+    ppm = (ppmVal && ppmVal > 0) ? ppmVal : ppm;
     computeBinFreqs();
-    stepIntervalMs = ppmToStepMs(ppm);
-    // clamp stepIntervalMs to prevent CPU blast
-    stepIntervalMs = Math.max(4, Math.min(2000, stepIntervalMs));
-    wfStepEl.title = `step interval ${stepIntervalMs} ms`;
+    stepMs = ppmToMs(ppm);
+    // ensure canvas resized to current bins mapping
+    binWidth = widthCss / bins;
+    if(!started){
+      started = true;
+      lastTime = performance.now();
+      acc = 0;
+      requestAnimationFrame(loop);
+    }
   }
 
-  // init
-  function start(){
-    resize();
-    // initialize canvas background
+  function setBins(n){
+    n = Math.max(10, Math.min(100, Math.round(n)));
+    if(n === bins) return;
+    // preserve some stepCounter fraction to avoid jump
+    bins = n;
+    computeBinFreqs();
+    binWidth = widthCss / bins;
+    // clear canvas so new resolution draws cleanly
     ctx.fillStyle = "#031025";
-    ctx.fillRect(0,0,canvas.clientWidth, canvas.clientHeight);
-    lastTime = performance.now();
-    stepIntervalMs = ppmToStepMs(ppm);
-    requestAnimationFrame(loop);
+    ctx.fillRect(0,0,widthCss,heightCss);
+    stepCounter = 0;
+    acc = 0;
   }
 
-  // expose API
+  // expose
   window.WaterfallChart = {
     updateFromLive,
-    start
+    setBins
   };
 
-  start();
+  // initialize and prepare loop (not started until updateFromLive called)
+  resizeCanvas();
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+
+  // wire bins slider
+  wfBinsSlider.addEventListener('input', ()=> {
+    const n = parseInt(wfBinsSlider.value,10);
+    wfBinsLabel.textContent = String(n);
+    try { window.WaterfallChart.setBins(n); }
+    catch(e){ console.warn(e); }
+  });
+
 })();
 
 /* initial checks */
@@ -926,10 +939,7 @@ if(!navigator.bluetooth){
   stopAutoBtn.disabled = true;
 }
 
-/* small wiring */
-document.getElementById('wfCurrentFreq').textContent = "-- kHz";
-document.getElementById('wfStep').textContent = "Step: --/100";
-document.getElementById('wfRange').textContent = "Range: -- kHz";
+/* End of file */
 </script>
 </body>
 </html>

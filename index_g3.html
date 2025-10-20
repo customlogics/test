@@ -633,8 +633,8 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
     ctx.lineTo(x, xAxisY + 5);
     ctx.stroke();
     // Shift last label slightly left to avoid cutoff
-    const labelX = (i === xTicks.length - 1) ? x - 8 : x;
-    ctx.fillText(`${freq} kHz`, labelX, xAxisY + 20);
+    const labelX = (i === xTicks.length - 1) ? x - 15 : x;
+    ctx.fillText(`${freq}`, labelX, xAxisY + 20);
   });
 
   // Y ticks and labels (0 to 100 dB)
@@ -653,11 +653,6 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
   // Overall labels
   ctx.font = 'bold 12px Inter, Arial';
   ctx.fillText('Frequency (kHz)', canvasWidth / 2, canvasHeight - 5);
-  ctx.save();
-  ctx.translate(marginLeft / 2, canvasHeight / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('Amplitude (dB)', 0, 0);
-  ctx.restore();
 }
 
 function animateSpectrum() {
@@ -1173,6 +1168,14 @@ if(!navigator.bluetooth){
   sendInitBtn.disabled = true;
   stopAutoBtn.disabled = true;
 }
+
+/* Handle canvas resize */
+window.addEventListener('resize', () => {
+  if (isAnimating) {
+    animationStartTime = performance.now();
+    requestAnimationFrame(animateSpectrum);
+  }
+});
 </script>
 </body>
 </html>

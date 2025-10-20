@@ -56,7 +56,7 @@
   .spectrum-container {
     position: relative;
     width: 100%;
-    height: 180px;
+    height: 220px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
     overflow: hidden;
@@ -87,6 +87,24 @@
     display: flex;
     gap: 8px;
     margin-top: 8px;
+  }
+  
+  .axis-label {
+    position: absolute;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  
+  .x-axis-label {
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .y-axis-label {
+    top: 50%;
+    left: -30px;
+    transform: translateY(-50%) rotate(-90deg);
   }
 
   .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:2000}
@@ -244,6 +262,8 @@
           </div>
           <div class="spectrum-container">
             <canvas id="spectrumCanvas" class="spectrum-canvas"></canvas>
+            <div class="axis-label x-axis-label">Frequency (kHz)</div>
+            <div class="axis-label y-axis-label">Amplitude (dB)</div>
             <div class="spectrum-info">
               <div>Min: <span id="spectrumMin">--</span> kHz | Max: <span id="spectrumMax">--</span> kHz</div>
               <div>Wave Velocity: <span id="spectrumWave">--</span> PPM | Current: <span id="spectrumCurrent">--</span> kHz</div>
@@ -566,14 +586,15 @@ let awaitingInitPromise = null;
 /* Spectrum Analysis state */
 let spectrumAnimationId = null;
 let spectrumData = {
-  minFreq: 0,
-  maxFreq: 0,
+  minFreq: 15,  // Default min frequency in kHz
+  maxFreq: 70,  // Default max frequency in kHz
   waveVelocity: 0,
   currentFreq: 0,
   isPlaying: false,
   direction: 1, // 1 for increasing, -1 for decreasing
   lastUpdateTime: 0,
-  steps: 100
+  steps: 256,
+  peaks: []
 };
 
 /* helpers */
@@ -732,6 +753,49 @@ function updateSpectrumData(liveData) {
   }
 }
 
+function generateFFTSpectrum() {
+  const spectrum = [];
+  const centerFreq = spectrumData.currentFreq;
+  const freqRange = spectrumData.maxFreq - spectrumData.minFreq;
+  
+  // Generate multiple peaks for more realistic FFT
+  const peaks = [
+    { freq: centerFreq, amplitude: 0.9 + Math.random() * 0.1 },
+    { freq: centerFreq - freqRange * 0.1, amplitude: 0.4 + Math.random() * 0.2 },
+    { freq: centerFreq + freqRange * 0.1, amplitude: 0.4 + Math.random() * 0.2 },
+    { freq: centerFreq - freqRange * 0.25, amplitude: 0.2 + Math.random() * 0.1 },
+    { freq: centerFreq + freqRange * 0.25, amplitude: 0.2 + Math.random() * 0.1 }
+  ];
+  
+  for (let i = 0; i < spectrumData.steps; i++) {
+    const freq = spectrumData.minFreq + (i / spectrumData.steps) * freqRange;
+    let amplitude = 0;
+    
+    // Sum contributions from all peaks
+    peaks.forEach(peak => {
+      const distance = Math.abs(freq - peak.freq);
+      const width = freqRange * 0.05;
+      const contribution = peak.amplitude * Math.exp(-(distance * distance) / (2 * width * width));
+      amplitude += contribution;
+    });
+    
+    // Add some noise
+    amplitude += (Math.random() - 0.5) * 0.05;
+    amplitude = Math.max(0, Math.min(1, amplitude));
+    
+    // Convert to dB scale (0-100 dB)
+    const dB = amplitude * 100;
+    
+    spectrum.push({
+      freq: freq,
+      amplitude: amplitude,
+      dB: dB
+    });
+  }
+  
+  return spectrum;
+}
+
 function drawSpectrum() {
   const canvas = spectrumCanvas;
   const ctx = canvas.getContext('2d');
@@ -739,61 +803,93 @@ function drawSpectrum() {
   const height = canvas.height;
   
   // Clear canvas
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+  ctx.fillStyle = 'rgba(10, 15, 25, 0.9)';
   ctx.fillRect(0, 0, width, height);
   
   // Draw grid
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.strokeStyle = 'rgba(100, 120, 150, 0.3)';
   ctx.lineWidth = 1;
   
-  // Vertical grid lines
+  // Vertical grid lines (frequency)
   for (let i = 0; i <= 10; i++) {
+    const x = i * width / 10;
     ctx.beginPath();
-    ctx.moveTo(i * width / 10, 0);
-    ctx.lineTo(i * width / 10, height);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
     ctx.stroke();
+    
+    // Frequency labels
+    if (i > 0 && i < 10) {
+      const freq = spectrumData.minFreq + (i / 10) * (spectrumData.maxFreq - spectrumData.minFreq);
+      ctx.fillStyle = 'rgba(200, 220, 255, 0.7)';
+      ctx.font = '10px Inter, Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(freq.toFixed(0) + 'kHz', x, height - 5);
+    }
   }
   
-  // Horizontal grid lines
+  // Horizontal grid lines (amplitude/dB)
   for (let i = 0; i <= 5; i++) {
+    const y = i * height / 5;
     ctx.beginPath();
-    ctx.moveTo(0, i * height / 5);
-    ctx.lineTo(width, i * height / 5);
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
     ctx.stroke();
+    
+    // dB labels
+    if (i > 0) {
+      const dB = 100 - (i * 20);
+      ctx.fillStyle = 'rgba(200, 220, 255, 0.7)';
+      ctx.font = '10px Inter, Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText(dB + 'dB', 5, y + 3);
+    }
   }
   
-  // Draw spectrum bars
-  const freqRange = spectrumData.maxFreq - spectrumData.minFreq;
-  const centerFreq = spectrumData.currentFreq;
+  // Generate FFT spectrum data
+  const spectrum = generateFFTSpectrum();
   
-  for (let i = 0; i < spectrumData.steps; i++) {
-    const freq = spectrumData.minFreq + (i / spectrumData.steps) * freqRange;
-    const distance = Math.abs(freq - centerFreq);
-    const maxDistance = freqRange / 2;
-    
-    // Calculate amplitude based on distance from current frequency
-    let amplitude = 1 - (distance / maxDistance);
-    amplitude = Math.max(0, amplitude);
-    
-    // Apply a bell curve for more realistic FFT appearance
-    amplitude = Math.pow(amplitude, 2);
-    
-    const barHeight = amplitude * height * 0.8;
-    const barWidth = width / spectrumData.steps;
-    const x = i * barWidth;
-    const y = height - barHeight;
-    
-    // Create gradient based on amplitude
-    const gradient = ctx.createLinearGradient(0, y, 0, height);
-    gradient.addColorStop(0, `rgba(255, 107, 157, ${0.3 + amplitude * 0.7})`);
-    gradient.addColorStop(1, `rgba(255, 107, 157, 0.1)`);
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(x, y, barWidth - 1, barHeight);
+  // Draw spectrum as filled area with gradient
+  ctx.beginPath();
+  ctx.moveTo(0, height);
+  
+  for (let i = 0; i < spectrum.length; i++) {
+    const x = (i / spectrum.length) * width;
+    const y = height - (spectrum[i].dB / 100) * height;
+    ctx.lineTo(x, y);
   }
+  
+  ctx.lineTo(width, height);
+  ctx.closePath();
+  
+  // Create multi-colored gradient
+  const gradient = ctx.createLinearGradient(0, 0, width, 0);
+  gradient.addColorStop(0, '#ff0066');
+  gradient.addColorStop(0.2, '#ff6600');
+  gradient.addColorStop(0.4, '#ffff00');
+  gradient.addColorStop(0.6, '#00ff66');
+  gradient.addColorStop(0.8, '#0066ff');
+  gradient.addColorStop(1, '#6600ff');
+  
+  ctx.fillStyle = gradient;
+  ctx.fill();
+  
+  // Draw spectrum line
+  ctx.beginPath();
+  ctx.moveTo(0, height - (spectrum[0].dB / 100) * height);
+  
+  for (let i = 1; i < spectrum.length; i++) {
+    const x = (i / spectrum.length) * width;
+    const y = height - (spectrum[i].dB / 100) * height;
+    ctx.lineTo(x, y);
+  }
+  
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
   
   // Draw current frequency indicator
-  const currentX = ((centerFreq - spectrumData.minFreq) / freqRange) * width;
+  const currentX = ((spectrumData.currentFreq - spectrumData.minFreq) / (spectrumData.maxFreq - spectrumData.minFreq)) * width;
   ctx.strokeStyle = '#FFD54A';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -802,7 +898,7 @@ function drawSpectrum() {
   ctx.stroke();
   
   // Update current frequency display
-  spectrumCurrent.textContent = centerFreq.toFixed(3);
+  spectrumCurrent.textContent = spectrumData.currentFreq.toFixed(3);
 }
 
 function updateSpectrumAnimation() {

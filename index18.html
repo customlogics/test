@@ -1019,18 +1019,16 @@ if(!navigator.bluetooth){
 }
 </script>
 
-<!-- ===== Spectrum visualizer (exponential drop + axis labels + edge clipping) ===== -->
+<!-- ===== Spectrum visualizer (exponential drop, numeric ticks without kHz, center amp 50-80 dB) ===== -->
 <script>
 (function(){
-  // ---------- constants / defaults ----------
-  const DISPLAY_MIN_HZ = 15000;  // display axis start (fixed)
-  const DISPLAY_MAX_HZ = 70000;  // display axis end (fixed)
-  const DB_AXIS_MAX = 100;       // axis 0..100 dB shown
-  const DB_DISPLAY_CAP = 100;    // normalization cap
+  const DISPLAY_MIN_HZ = 15000;
+  const DISPLAY_MAX_HZ = 70000;
+  const DB_AXIS_MAX = 100;
+  const DB_DISPLAY_CAP = 100;
 
-  // ---------- state ----------
   let bins = 50;
-  let sigma = 5.5;      // user control maps to falloff strength
+  let sigma = 5.5;
   let minHz = 15000;
   let maxHz = 70000;
   let ppm = 1.0;
@@ -1038,7 +1036,6 @@ if(!navigator.bluetooth){
   let stopped = false;
   let startTime = performance.now();
 
-  // ---------- DOM ----------
   const canvas = document.getElementById('spectrumCanvas');
   const stepsSlider = document.getElementById('spectrumSteps');
   const stepsLabel = document.getElementById('spectrumStepsLabel');
@@ -1048,7 +1045,6 @@ if(!navigator.bluetooth){
   const infoBar = document.getElementById('spectrumInfo');
   const ctx = canvas.getContext('2d');
 
-  // ---------- sizing ----------
   function resize(){
     const dpr = window.devicePixelRatio || 1;
     const cw = canvas.clientWidth || canvas.width;
@@ -1060,9 +1056,7 @@ if(!navigator.bluetooth){
   window.addEventListener('resize', resize);
   resize();
 
-  // ---------- helpers ----------
   function expDrop(dist, falloff){
-    // exponential drop: e^(-falloff * dist)
     return Math.exp(-Math.max(0, falloff) * dist);
   }
 
@@ -1077,12 +1071,8 @@ if(!navigator.bluetooth){
       if(db > maxRaw) maxRaw = db;
       if(db < minRaw) minRaw = db;
     }
-    if(maxRaw === -Infinity){
-      maxRaw = 0; minRaw = -60;
-    }
-    if(maxRaw === minRaw){
-      minRaw = maxRaw - 60;
-    }
+    if(maxRaw === -Infinity){ maxRaw = 0; minRaw = -60; }
+    if(maxRaw === minRaw) minRaw = maxRaw - 60;
     const out = new Float32Array(amps.length);
     for(let i=0;i<amps.length;i++){
       out[i] = (raw[i] - minRaw) / (maxRaw - minRaw) * DB_DISPLAY_CAP;
@@ -1098,7 +1088,6 @@ if(!navigator.bluetooth){
     return left + frac * width;
   }
 
-  // ---------- draw loop ----------
   function draw(now){
     if(stopped){
       ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -1111,7 +1100,6 @@ if(!navigator.bluetooth){
       requestAnimationFrame(draw);
       return;
     }
-
     if(!firstLive){
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.fillStyle = "rgba(255,255,255,0.03)";
@@ -1128,18 +1116,15 @@ if(!navigator.bluetooth){
     const H = canvas.clientHeight;
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // layout margins
     const leftMargin = 56;
     const bottomMargin = 44;
     const topMargin = 12;
     const drawW = W - leftMargin - 12;
     const drawH = H - bottomMargin - topMargin;
 
-    // subtle background panel
     ctx.fillStyle = "rgba(255,255,255,0.01)";
     ctx.fillRect(leftMargin, topMargin, drawW, drawH);
 
-    // draw Y axis grid and numeric labels (0..100 every 20)
     ctx.strokeStyle = "rgba(255,255,255,0.04)";
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "11px Inter, Arial, sans-serif";
@@ -1155,7 +1140,6 @@ if(!navigator.bluetooth){
       ctx.fillText(String(d), 8, y);
     }
 
-    // draw X numeric ticks (15..70 kHz)
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     ctx.font = "11px Inter, Arial, sans-serif";
     ctx.textBaseline = "top";
@@ -1168,56 +1152,51 @@ if(!navigator.bluetooth){
       ctx.lineTo(x, topMargin + drawH + 6);
       ctx.stroke();
       ctx.textAlign = "center";
-      ctx.fillText((f/1000).toFixed(0) + " kHz", x, topMargin + drawH + 8);
+      // <-- numeric-only labels (no kHz suffix) -->
+      ctx.fillText((f/1000).toFixed(0), x, topMargin + drawH + 8);
     }
 
-    // compute sweep position (triangle)
     const effPpm = Math.max(0.0001, ppm);
     const cycleMs = 60000 / effPpm;
     const elapsed = now - startTime;
     const progress = (elapsed % cycleMs) / cycleMs;
     const pos = (progress <= 0.5) ? (progress * 2 * (bins - 1)) : ((2 - progress * 2) * (bins - 1));
 
-    // build exponential amplitudes across bins (centered at pos)
     const amps = new Float32Array(bins);
     let maxAmp = 0;
-
-    // falloff factor derived from sigma slider (higher sigma -> slower falloff)
-    // invert mapping so slider value larger -> narrower/steeper falloff
     const falloff = Math.max(0.2, 1.2 + (11 - sigma) * 0.45);
 
     for(let i=0;i<bins;i++){
       const dist = Math.abs(i - pos);
-      // exponential drop (sharper than gaussian); raise to a power for extra steepness
       let a = expDrop(dist, falloff);
-      a = Math.pow(a, 1.4); // sharpen
-      // small center plateau
+      a = Math.pow(a, 1.4);
       if(dist < 0.6) a = Math.max(a, 0.96);
-      // slight natural jitter over time to look lively
       a *= (0.88 + 0.24 * Math.abs(Math.sin((i*0.7 + now/350))));
       amps[i] = a;
       if(a > maxAmp) maxAmp = a;
     }
-    if(maxAmp > 0){
-      for(let i=0;i<bins;i++) amps[i] /= maxAmp;
-    }
+    if(maxAmp > 0) for(let i=0;i<bins;i++) amps[i] /= maxAmp;
 
-    // edge clipping: when center freq is at/near device min or max, truncate lobe on that side
     const centerFreq = minHz + (maxHz - minHz) * (pos / Math.max(1, bins - 1));
-    const edgeTolHz = (maxHz - minHz) * 0.02; // 2% tolerance
+    const edgeTolHz = (maxHz - minHz) * 0.02;
     const leftCut = centerFreq <= (minHz + edgeTolHz);
     const rightCut = centerFreq >= (maxHz - edgeTolHz);
-
-    // apply an envelope to zero-out the cut side smoothly (or hard cut if exactly at edge)
     for(let i=0;i<bins;i++){
-      // compute freq of bin
       const freq = minHz + (maxHz - minHz) * (i / Math.max(1, bins - 1));
-      if(leftCut && freq < centerFreq - 1){ amps[i] = 0; }      // fully cut left side
-      if(rightCut && freq > centerFreq + 1){ amps[i] = 0; }     // fully cut right side
+      if(leftCut && freq < centerFreq - 1) amps[i] = 0;
+      if(rightCut && freq > centerFreq + 1) amps[i] = 0;
     }
 
-    // convert amps to dB-normalized (0..DB_DISPLAY_CAP) and to pixels
+    // convert to dB normalized array
     const ampsDb = ampsToDbArray(amps);
+
+    // override center dB to a random value between 50..80 dB (user request)
+    const centerIdx = Math.max(0, Math.min(bins-1, Math.round(pos)));
+    const randomCenterDb = 50 + Math.random() * 30; // 50..80
+    // clamp to axis cap
+    const clampedCenterDb = Math.max(0, Math.min(DB_AXIS_MAX, randomCenterDb));
+    ampsDb[centerIdx] = clampedCenterDb;
+
     const barPixels = new Float32Array(bins);
     for(let i=0;i<bins;i++){
       const dbVal = ampsDb[i];
@@ -1225,7 +1204,6 @@ if(!navigator.bluetooth){
       barPixels[i] = h;
     }
 
-    // draw bars
     const gap = 2;
     const nominalBarW = Math.max(2, (drawW - (bins - 1) * gap) / bins);
     for(let i=0;i<bins;i++){
@@ -1238,21 +1216,18 @@ if(!navigator.bluetooth){
       const amp = Math.max(0, Math.min(1, amps[i]));
       const distFromCenter = Math.abs(i - pos);
 
-      // color ramp: green -> yellow -> orange -> red using hue mapping
-      const hue = 120 - Math.floor(120 * amp); // 120(green) to 0(red)
+      const hue = 120 - Math.floor(120 * amp);
       const light = 45 + Math.floor(30 * amp);
       const sat = 70 + Math.floor(20 * amp);
       const alpha = 0.55 + 0.35 * amp;
 
-      // highlight center
       let fillColor;
       if(distFromCenter < 0.6 && amp > 0.2){
-        fillColor = `rgba(255,215,120,${Math.min(1,0.6 + 0.6*amp)})`; // golden highlight
+        fillColor = `rgba(255,215,120,${Math.min(1,0.6 + 0.6*amp)})`;
       } else {
         fillColor = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
       }
 
-      // draw rounded-top bar
       const bx = x - barW/2;
       const br = Math.min(8, barW/2);
       ctx.beginPath();
@@ -1265,14 +1240,12 @@ if(!navigator.bluetooth){
       ctx.quadraticCurveTo(bx, y, bx + br, y);
       ctx.closePath();
 
-      // gradient fill for depth
       const grad = ctx.createLinearGradient(0, y, 0, topMargin + drawH);
       grad.addColorStop(0, fillColor);
       grad.addColorStop(1, "rgba(0,0,0,0.08)");
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // small highlight stroke on top of tall bars
       if(barH > 6){
         ctx.strokeStyle = "rgba(255,255,255,0.06)";
         ctx.lineWidth = 0.8;
@@ -1283,21 +1256,18 @@ if(!navigator.bluetooth){
       }
     }
 
-    // show left axis label "dB" and right small legend (no numeric duplication)
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     ctx.font = "12px Inter, Arial, sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("dB", 8, topMargin);
 
-    // show small device range + speed + center info; center dB randomized 50..80 as requested
-    const centerDb = (50 + Math.random() * 30).toFixed(1);
-    infoBar.textContent = `Min: ${(minHz/1000).toFixed(3)} kHz · Max: ${(maxHz/1000).toFixed(3)} kHz · Speed: ${ppm.toFixed(2)} ppm · center ${(centerFreq/1000).toFixed(3)} kHz · ${centerDb} dB`;
+    // info bar shows numeric center dB (the same randomized value), and kHz values remain as decimals
+    infoBar.textContent = `Min: ${(minHz/1000).toFixed(3)} kHz · Max: ${(maxHz/1000).toFixed(3)} kHz · Speed: ${ppm.toFixed(2)} ppm · center ${(centerFreq/1000).toFixed(3)} kHz · ${clampedCenterDb.toFixed(1)} dB`;
 
     requestAnimationFrame(draw);
   }
   requestAnimationFrame(draw);
 
-  // ---------- UI wiring ----------
   stepsSlider.addEventListener('input', ()=>{
     bins = Math.max(2, Number(stepsSlider.value) || 50);
     stepsLabel.textContent = String(bins);
@@ -1314,14 +1284,12 @@ if(!navigator.bluetooth){
     if(!stopped) startTime = performance.now();
   });
 
-  // defaults + disabled until first live
   stepsLabel.textContent = String(bins);
   sigmaLabel.textContent = sigma.toFixed(2);
   stepsSlider.disabled = true;
   sigmaSlider.disabled = true;
   toggleBtn.disabled = true;
 
-  // ---------- external API ----------
   window.__spectrum = {
     setRangeAndPpm: function(min_v, max_v, ppm_v){
       const mn = Number(min_v);
@@ -1353,12 +1321,11 @@ if(!navigator.bluetooth){
     resume: function(){ stopped = false; firstLive = true; stepsSlider.disabled = false; sigmaSlider.disabled = false; toggleBtn.disabled = false; startTime = performance.now(); },
   };
 
-  // read global initial values if provided externally
   try{
     if(typeof window.min_Hz !== 'undefined' && typeof window.max_Hz !== 'undefined'){
       window.__spectrum.setRangeAndPpm(window.min_Hz, window.max_Hz, window.waveVal || 1.0);
     }
-  }catch(e){ /* ignore */ }
+  }catch(e){}
 
   setTimeout(resize,120);
 })();

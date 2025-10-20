@@ -1001,50 +1001,66 @@ if(!navigator.bluetooth){
   stopAutoBtn.disabled = true;
 }
 </script>
-  <!-- BEGIN: Spectrum visualizer injection (paste before </body>) -->
+
+  
+ <!-->
+   <!-->
+ <!-- BEGIN: Spectrum visualizer — integrated, waits for LIVE, matches .tile -->
 <style id="fft-inject-styles">
-  /* minimal styles to avoid touching other page CSS */
-  #fft-inject-wrap{max-width:100%;margin:12px 0;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px;border-left:6px solid #9b62ff;font-family:Inter,Arial,sans-serif;color:#e6eef6}
-  #fft-inject-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-  #fft-inject-canvas{width:100%;height:140px;display:block;background:linear-gradient(0deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border-radius:6px}
-  #fft-inject-controls{display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap}
-  #fft-inject-controls .label{color:#9aa4b2;font-size:13px}
-  #fft-inject-controls input[type=range]{width:180px}
-  #fft-inject-info{color:#9aa4b2;font-size:13px;margin-left:auto}
-  @media (max-width:640px){ #fft-inject-controls input[type=range]{width:120px} }
+  /* Minimal local styles only for this tile — doesn't override global page styles */
+  #fft-inject-wrap { padding:10px; border-left:6px solid #9b62ff; background:rgba(255,255,255,0.02); border-radius:8px; color:inherit; }
+  #fft-inject-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  #fft-inject-canvas { width:100%; height:140px; display:block; background:linear-gradient(0deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005)); border-radius:6px; }
+  #fft-inject-controls { display:flex; gap:12px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+  #fft-inject-controls .label { color: #9aa4b2; font-size:13px; }
+  #fft-inject-controls input[type=range] { width:180px; }
+  #fft-inject-info { color:#9aa4b2; font-size:13px; margin-left:auto; }
+  #fft-inject-disabled { color:#9aa4b2; font-size:13px; margin-top:8px; }
+  @media (max-width:640px){ #fft-inject-controls input[type=range]{ width:120px } }
 </style>
 
-<div id="fft-inject-wrap" aria-live="polite" title="Spectral visualizer injected by helper script">
+<!-- Put the visualizer inside a .tile so it matches other cards on the page -->
+<div id="fft-inject-wrap" class="tile" title="Spectrum visualizer (injected)">
   <div id="fft-inject-head">
     <div style="font-weight:600">Spectrum Visualization</div>
     <div id="fft-inject-info">Min: -- · Max: -- · Speed: -- ppm</div>
   </div>
-  <canvas id="fft-inject-canvas" width="900" height="140"></canvas>
+
+  <canvas id="fft-inject-canvas" width="900" height="140" aria-hidden="false"></canvas>
+
   <div id="fft-inject-controls">
-    <div class="label">Steps</div>
-    <input id="fft-steps" type="range" min="2" max="500" value="100" step="1" />
-    <div id="fft-steps-label" class="label">100</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="label">Steps</div>
+      <input id="fft-steps" type="range" min="2" max="500" value="100" step="1" disabled />
+      <div id="fft-steps-label" class="label">100</div>
+    </div>
 
-    <div class="label">Spread</div>
-    <input id="fft-sigma" type="range" min="0.5" max="10" value="3" step="0.1" />
-    <div id="fft-sigma-label" class="label">3.0</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="label">Spread</div>
+      <input id="fft-sigma" type="range" min="0.5" max="10" value="3" step="0.1" disabled />
+      <div id="fft-sigma-label" class="label">3.0</div>
+    </div>
 
-    <button id="fft-toggle" style="margin-left:8px;padding:6px 10px;border-radius:6px;border:0;background:#9b62ff;color:#071022;cursor:pointer">Pause</button>
+    <button id="fft-toggle" style="margin-left:8px;padding:6px 10px;border-radius:6px;border:0;background:#9b62ff;color:#071022;cursor:pointer" disabled>Pause</button>
+
   </div>
+
+  <div id="fft-inject-disabled">Waiting for LIVE data (BLE) — visualizer will start after min/max/ppm are received.</div>
 </div>
 
 <script>
 (function(){
-  // --- configuration / state ---
-  let bins = 100;            // dynamic, controlled by slider
-  let sigma = 3.0;           // gaussian spread
-  let minHz = 20000;         // Hz
-  let maxHz = 60000;         // Hz
-  let ppm = 1.0;             // pulses per minute => full min->max->min cycle in 60000/ppm ms
-  let running = true;
+  // ---------- visualizer state ----------
+  let bins = 100;
+  let sigma = 3.0;
+  let minHz = 20000;
+  let maxHz = 60000;
+  let ppm = 1.0;
+  let running = false;          // IMPORTANT: only true after first LIVE packet
   let startTime = performance.now();
+  let firstLiveReceived = false;
 
-  // --- create references to injected DOM ---
+  // ---------- DOM refs ----------
   const container = document.getElementById('fft-inject-wrap');
   const canvas = document.getElementById('fft-inject-canvas');
   const stepsSlider = document.getElementById('fft-steps');
@@ -1053,9 +1069,10 @@ if(!navigator.bluetooth){
   const sigmaLabel = document.getElementById('fft-sigma-label');
   const toggleBtn = document.getElementById('fft-toggle');
   const info = document.getElementById('fft-inject-info');
+  const note = document.getElementById('fft-inject-disabled');
   const ctx = canvas.getContext('2d');
 
-  // responsive canvas sizing
+  // ---------- responsive canvas ----------
   function resizeCanvas(){
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth || canvas.width;
@@ -1067,34 +1084,46 @@ if(!navigator.bluetooth){
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  // triangle position utility: progress 0..1 => pos 0..bins-1..0
+  // ---------- math helpers ----------
   function trianglePos(progress){
-    const t = (progress <= 0.5) ? (progress*2) : (2 - progress*2);
+    const t = (progress <= 0.5) ? (progress * 2) : (2 - progress * 2);
     return t * (bins - 1);
   }
-
   function gaussian(x, mu, s){
     const v = (x - mu) / s;
     return Math.exp(-0.5 * v * v);
   }
 
-  // draw loop
+  // ---------- draw loop (idle until firstLiveReceived) ----------
   function draw(now){
-    if(!running){ requestAnimationFrame(draw); return; }
+    // if we haven't received live data yet, draw a subtle idle frame
+    if(!firstLiveReceived){
+      // small subtle idle message so tile doesn't look broken
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "rgba(255,255,255,0.03)";
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "12px Inter, Arial, sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Waiting for LIVE min/max/ppm...", 10, canvas.clientHeight/2);
+      requestAnimationFrame(draw);
+      return;
+    }
 
+    // if paused, still show current static view but skip progress updates
     const W = canvas.clientWidth;
     const H = canvas.clientHeight;
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // cycle duration in ms: 60000 / ppm
+    // compute cycle based on ppm (ms)
     const effectivePpm = Math.max(0.0001, ppm);
     const cycleMs = 60000 / effectivePpm;
     const elapsed = now - startTime;
-    const progress = (elapsed % cycleMs) / cycleMs; // 0..1
-    const pos = trianglePos(progress);              // 0..bins-1 (float)
-    const centerFreqHz = minHz + (maxHz - minHz) * (pos / Math.max(1, (bins - 1)));
+    const progress = (elapsed % cycleMs) / cycleMs;
+    const pos = trianglePos(progress);
+    const centerFreqHz = minHz + (maxHz - minHz) * (pos / Math.max(1, (bins-1)));
 
-    // calculate amplitudes
+    // amplitudes
     const amps = new Float32Array(bins);
     let maxAmp = 0;
     for(let i=0;i<bins;i++){
@@ -1114,8 +1143,7 @@ if(!navigator.bluetooth){
       const amp = amps[i];
       const barH = amp * (H - 10);
       const y = H - barH;
-
-      const dist = Math.abs(i - pos) / (bins);
+      const dist = Math.abs(i - pos) / bins;
       const alpha = Math.max(0.18, 0.95 * amp);
       const r = Math.round(255 * (0.9 * amp + 0.1));
       const g = Math.round(170 * (0.3 + 0.7*(1 - dist)));
@@ -1124,8 +1152,7 @@ if(!navigator.bluetooth){
       if(Math.abs(i - pos) < 0.5){
         ctx.fillStyle = `rgba(255,210,120,${Math.max(0.5, alpha)})`;
       }
-
-      // rounded-rectangle bar
+      // rounded rect bar
       const radius = Math.min(6, barW/2);
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
@@ -1139,7 +1166,7 @@ if(!navigator.bluetooth){
       ctx.fill();
     }
 
-    // overlay info text and update small infobar
+    // overlay info
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "12px Inter, Arial, sans-serif";
     ctx.textBaseline = "top";
@@ -1152,67 +1179,89 @@ if(!navigator.bluetooth){
   }
   requestAnimationFrame(draw);
 
-  // handle UI interactions
+  // ---------- UI wiring ----------
   stepsSlider.addEventListener('input', ()=>{
     bins = Math.max(2, Number(stepsSlider.value) || 100);
     stepsLabel.textContent = String(bins);
-    // reset time base for smoother motion
-    startTime = performance.now();
+    startTime = performance.now(); // reset so motion stays smooth
+    resizeCanvas();
   });
   sigmaSlider.addEventListener('input', ()=>{
     sigma = Math.max(0.5, Number(sigmaSlider.value) || 3.0);
     sigmaLabel.textContent = sigma.toFixed(2);
   });
   toggleBtn.addEventListener('click', ()=>{
+    // toggles drawing; when false, draw loop still runs but timebase still updates so position changes
     running = !running;
     toggleBtn.textContent = running ? 'Pause' : 'Resume';
-    if(running) { startTime = performance.now(); }
+    if(running) startTime = performance.now();
   });
 
-  // responsive initial labels
+  // initialize labels and disabled state
   stepsLabel.textContent = String(bins);
   sigmaLabel.textContent = sigma.toFixed(2);
+  stepsSlider.disabled = true;
+  sigmaSlider.disabled = true;
+  toggleBtn.disabled = true;
 
-  // adapt to different units: accept kHz or Hz
+  // ---------- frequency normalization utility ----------
   function normalizeFreqs(a,b){
     let mn = Number(a);
     let mx = Number(b);
     if(isNaN(mn) || isNaN(mx)) return null;
-    // if both < 1000 assume values are kHz — convert to Hz
     if(mn < 1000 && mx < 1000){ mn *= 1000; mx *= 1000; }
     return {mn, mx};
   }
 
-  // --- integrate with existing showLive without altering behaviour ---
-  // If a showLive exists, wrap it; otherwise define it.
+  // ---------- showLive wrapper (preserve original) ----------
   const originalShowLive = window.showLive && typeof window.showLive === 'function' ? window.showLive : null;
+
   window.showLive = function(obj){
     try{
-      // call original if present (preserve existing behavior)
-      if(originalShowLive) {
-        try{ originalShowLive(obj); } catch(e){ console.warn('original showLive threw',e); }
+      // call original first so nothing changes on page flow
+      if(originalShowLive){
+        try{ originalShowLive(obj); } catch(e){ console.warn('original showLive error', e); }
       }
       if(!obj) return;
-      // try to read min & max & waveVal from obj with common keys
+
+      // read likely keys (per your page): min_Hz, minHz, min, min_freq etc.
       const maybeMin = obj.min_Hz ?? obj.minHz ?? obj.min ?? obj.min_freq ?? null;
       const maybeMax = obj.max_Hz ?? obj.maxHz ?? obj.max ?? obj.max_freq ?? null;
       const maybeWave = obj.waveVal ?? obj.wave_val ?? obj.wave ?? obj.ppm ?? obj.speed ?? null;
-
       const normalized = normalizeFreqs(maybeMin, maybeMax);
       if(normalized){
         minHz = normalized.mn;
         maxHz = normalized.mx;
       }
-      if(maybeWave != null && !isNaN(Number(maybeWave))) {
+      if(maybeWave != null && !isNaN(Number(maybeWave))){
         ppm = Number(maybeWave) || ppm;
       }
-      // reset timebase so visual syncs to new wave
-      startTime = performance.now();
-      // no other UI changes are made here to avoid interfering with your page
+
+      // Enable visualizer controls when the first valid live packet arrives
+      if(!firstLiveReceived && normalized){
+        firstLiveReceived = true;
+        running = true;
+        startTime = performance.now();
+        note.style.display = 'none';                // hide waiting note
+        stepsSlider.disabled = false;               // enable controls
+        sigmaSlider.disabled = false;
+        toggleBtn.disabled = false;
+        toggleBtn.textContent = 'Pause';
+        // ensure control UI reflects current values
+        stepsSlider.value = bins;
+        sigmaSlider.value = sigma;
+        stepsLabel.textContent = String(bins);
+        sigmaLabel.textContent = sigma.toFixed(2);
+        // resize after becoming visible
+        setTimeout(resizeCanvas, 50);
+      } else {
+        // If subsequent packets come that update min/max/ppm, reset animation timebase for sync
+        startTime = performance.now();
+      }
     }catch(e){ console.warn('fft-inject showLive error', e); }
   };
 
-  // also expose a direct setter if you need to call it from other code:
+  // ---------- direct setter for other code to call if needed ----------
   window.__fft_inject = {
     setRangeAndPpm: function(min_v, max_v, ppm_v){
       const normalized = normalizeFreqs(min_v, max_v);
@@ -1221,26 +1270,35 @@ if(!navigator.bluetooth){
         maxHz = normalized.mx;
       }
       if(ppm_v != null && !isNaN(Number(ppm_v))) ppm = Number(ppm_v);
+      // consider this a live event if not already
+      if(!firstLiveReceived){
+        firstLiveReceived = true;
+        running = true;
+        note.style.display = 'none';
+        stepsSlider.disabled = false;
+        sigmaSlider.disabled = false;
+        toggleBtn.disabled = false;
+      }
       startTime = performance.now();
     },
     setSteps: function(s){ bins = Math.max(2, Number(s)||bins); stepsSlider.value = bins; stepsLabel.textContent = String(bins); },
     setSigma: function(s){ sigma = Math.max(0.5, Number(s)||sigma); sigmaSlider.value = sigma; sigmaLabel.textContent = sigma.toFixed(2); }
   };
 
-  // if your page already has values (global variables), try to pick them up now quietly:
+  // Attempt to pick up any global values already present on the page (non-intrusive)
   try{
     if(typeof window.min_Hz !== 'undefined' && typeof window.max_Hz !== 'undefined'){
       const n = normalizeFreqs(window.min_Hz, window.max_Hz);
-      if(n) { minHz = n.mn; maxHz = n.mx; }
+      if(n){ minHz = n.mn; maxHz = n.mx; }
     }
     if(typeof window.waveVal !== 'undefined') ppm = Number(window.waveVal) || ppm;
   }catch(e){ /* ignore */ }
 
-  // autosize once
+  // autosize after insertion
   setTimeout(resizeCanvas, 120);
 })();
 </script>
-<!-- END: Spectrum visualizer injection -->
-
+<!-- END: Spectrum visualizer -->
+ 
 </body>
 </html>

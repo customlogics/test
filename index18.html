@@ -578,7 +578,7 @@ function showLive(obj){
   card_days.textContent = (obj.days != null) ? obj.days.toString() + " Days" : "-- Days";
   card_hhmmss.textContent = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "--:--:--";
 
-  // visualizer integration (non-intrusive)
+  // visualizer integration
   try{
     if(window.__spectrum && typeof window.__spectrum.setRangeAndPpm === 'function'){
       window.__spectrum.setRangeAndPpm(obj.min_Hz, obj.max_Hz, obj.waveVal);
@@ -1019,18 +1019,18 @@ if(!navigator.bluetooth){
 }
 </script>
 
-<!-- ===== Spectrum visualizer (updated) ===== -->
+<!-- ===== Spectrum visualizer (exponential drop + axis labels + edge clipping) ===== -->
 <script>
 (function(){
   // ---------- constants / defaults ----------
-  const DISPLAY_MIN_HZ = 15000;  // fixed display axis start
-  const DISPLAY_MAX_HZ = 70000;  // fixed display axis end
+  const DISPLAY_MIN_HZ = 15000;  // display axis start (fixed)
+  const DISPLAY_MAX_HZ = 70000;  // display axis end (fixed)
   const DB_AXIS_MAX = 100;       // axis 0..100 dB shown
-  const DB_DISPLAY_CAP = 100;    // max dB displayed for bars (used for normalization)
+  const DB_DISPLAY_CAP = 100;    // normalization cap
 
   // ---------- state ----------
   let bins = 50;
-  let sigma = 5.5;
+  let sigma = 5.5;      // user control maps to falloff strength
   let minHz = 15000;
   let maxHz = 70000;
   let ppm = 1.0;
@@ -1061,19 +1061,18 @@ if(!navigator.bluetooth){
   resize();
 
   // ---------- helpers ----------
-  function gaussian(x, mu, s){
-    const v = (x - mu) / s;
-    return Math.exp(-0.5 * v * v);
+  function expDrop(dist, falloff){
+    // exponential drop: e^(-falloff * dist)
+    return Math.exp(-Math.max(0, falloff) * dist);
   }
 
-  // Convert amplitude (0..1) to "log dB" using 20*log10, then normalize dynamic range to 0..DB_DISPLAY_CAP
   function ampsToDbArray(amps){
     const eps = 1e-6;
     const raw = new Float32Array(amps.length);
     let maxRaw = -Infinity, minRaw = Infinity;
     for(let i=0;i<amps.length;i++){
       const a = Math.max(eps, amps[i]);
-      const db = 20 * Math.log10(a); // negative numbers when a<1
+      const db = 20 * Math.log10(a);
       raw[i] = db;
       if(db > maxRaw) maxRaw = db;
       if(db < minRaw) minRaw = db;
@@ -1082,9 +1081,8 @@ if(!navigator.bluetooth){
       maxRaw = 0; minRaw = -60;
     }
     if(maxRaw === minRaw){
-      minRaw = maxRaw - 60; // ensure spread
+      minRaw = maxRaw - 60;
     }
-    // normalize raw to 0..DB_DISPLAY_CAP
     const out = new Float32Array(amps.length);
     for(let i=0;i<amps.length;i++){
       out[i] = (raw[i] - minRaw) / (maxRaw - minRaw) * DB_DISPLAY_CAP;
@@ -1094,7 +1092,6 @@ if(!navigator.bluetooth){
     return out;
   }
 
-  // map a frequency (Hz) in DISPLAY_MIN_HZ..DISPLAY_MAX_HZ to pixel x
   function freqToX(freq, left, width){
     const f = Math.max(DISPLAY_MIN_HZ, Math.min(DISPLAY_MAX_HZ, freq));
     const frac = (f - DISPLAY_MIN_HZ) / (DISPLAY_MAX_HZ - DISPLAY_MIN_HZ);
@@ -1103,7 +1100,6 @@ if(!navigator.bluetooth){
 
   // ---------- draw loop ----------
   function draw(now){
-    // stopped overlay
     if(stopped){
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.fillStyle = "rgba(0,0,0,0.25)";
@@ -1133,69 +1129,95 @@ if(!navigator.bluetooth){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
     // layout margins
-    const leftMargin = 48;
-    const bottomMargin = 36;
+    const leftMargin = 56;
+    const bottomMargin = 44;
+    const topMargin = 12;
     const drawW = W - leftMargin - 12;
-    const drawH = H - bottomMargin - 8;
+    const drawH = H - bottomMargin - topMargin;
 
-    // subtle background
+    // subtle background panel
     ctx.fillStyle = "rgba(255,255,255,0.01)";
-    ctx.fillRect(leftMargin, 6, drawW, drawH);
+    ctx.fillRect(leftMargin, topMargin, drawW, drawH);
 
-    // Y horizontal grid lines (no numeric labels) and subtle tick markers
-    ctx.strokeStyle = "rgba(255,255,255,0.03)";
-    ctx.lineWidth = 1;
-    for(let d=0; d<=100; d+=20){
-      const y = 6 + drawH - (d / DB_AXIS_MAX) * drawH;
+    // draw Y axis grid and numeric labels (0..100 every 20)
+    ctx.strokeStyle = "rgba(255,255,255,0.04)";
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "11px Inter, Arial, sans-serif";
+    ctx.textBaseline = "middle";
+    for(let d=0; d<=DB_AXIS_MAX; d+=20){
+      const y = topMargin + drawH - (d / DB_AXIS_MAX) * drawH;
       ctx.beginPath();
       ctx.moveTo(leftMargin, y);
       ctx.lineTo(leftMargin + drawW, y);
       ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.textAlign = "left";
+      ctx.fillText(String(d), 8, y);
     }
 
-    // draw static axis labels (no numeric ticks)
+    // draw X numeric ticks (15..70 kHz)
     ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = "12px Inter, Arial, sans-serif";
+    ctx.font = "11px Inter, Arial, sans-serif";
     ctx.textBaseline = "top";
-    ctx.fillText("dB", 6, 8); // small dB label at left/top
-    ctx.textBaseline = "bottom";
-    ctx.fillText("kHz", leftMargin + drawW - 28, 6 + drawH + 18); // small kHz at x-axis right
+    const tickHz = [15000,20000,25000,30000,35000,40000,45000,50000,55000,60000,65000,70000];
+    for(const f of tickHz){
+      const x = freqToX(f, leftMargin, drawW);
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.beginPath();
+      ctx.moveTo(x, topMargin + drawH);
+      ctx.lineTo(x, topMargin + drawH + 6);
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.fillText((f/1000).toFixed(0) + " kHz", x, topMargin + drawH + 8);
+    }
 
-    // compute progress & center pos
+    // compute sweep position (triangle)
     const effPpm = Math.max(0.0001, ppm);
     const cycleMs = 60000 / effPpm;
     const elapsed = now - startTime;
     const progress = (elapsed % cycleMs) / cycleMs;
-    // triangular sweep -> center index
     const pos = (progress <= 0.5) ? (progress * 2 * (bins - 1)) : ((2 - progress * 2) * (bins - 1));
 
-    // build amplitudes (FFT-like) across device minHz..maxHz bins
+    // build exponential amplitudes across bins (centered at pos)
     const amps = new Float32Array(bins);
     let maxAmp = 0;
-    // sharper skirts: use Gaussian then apply a higher-order falloff and slight asymmetry to make the sides steeper
+
+    // falloff factor derived from sigma slider (higher sigma -> slower falloff)
+    // invert mapping so slider value larger -> narrower/steeper falloff
+    const falloff = Math.max(0.2, 1.2 + (11 - sigma) * 0.45);
+
     for(let i=0;i<bins;i++){
-      const g = gaussian(i, pos, sigma);
-      // sharpen: raise to a power to make sides steeper
-      let a = Math.pow(g, 2.2);
-      // add a small plateau near center to emulate FFT main lobe
-      const centerDist = Math.abs(i - pos);
-      if(centerDist < 0.75) a = Math.max(a, 0.9);
-      // gentle asymmetry randomness for natural look
-      a *= 0.85 + 0.3 * Math.abs(Math.sin((i + performance.now()/300) * 0.1));
+      const dist = Math.abs(i - pos);
+      // exponential drop (sharper than gaussian); raise to a power for extra steepness
+      let a = expDrop(dist, falloff);
+      a = Math.pow(a, 1.4); // sharpen
+      // small center plateau
+      if(dist < 0.6) a = Math.max(a, 0.96);
+      // slight natural jitter over time to look lively
+      a *= (0.88 + 0.24 * Math.abs(Math.sin((i*0.7 + now/350))));
       amps[i] = a;
       if(a > maxAmp) maxAmp = a;
     }
-    if(maxAmp > 0) for(let i=0;i<bins;i++) amps[i] /= maxAmp;
-
-    // introduce a small high-frequency tail fall: multiply by an edge envelope so bins further from center fall faster
-    for(let i=0;i<bins;i++){
-      const d = Math.abs(i - pos) / Math.max(1, bins/6);
-      const envelope = Math.exp(-Math.pow(d, 2.4)); // steeper than gaussian side fall
-      amps[i] *= envelope;
+    if(maxAmp > 0){
+      for(let i=0;i<bins;i++) amps[i] /= maxAmp;
     }
 
-    // map amps to dB logarithmically & capped to DB_DISPLAY_CAP, then to pixels (0..drawH)
-    const ampsDb = ampsToDbArray(amps); // 0..DB_DISPLAY_CAP
+    // edge clipping: when center freq is at/near device min or max, truncate lobe on that side
+    const centerFreq = minHz + (maxHz - minHz) * (pos / Math.max(1, bins - 1));
+    const edgeTolHz = (maxHz - minHz) * 0.02; // 2% tolerance
+    const leftCut = centerFreq <= (minHz + edgeTolHz);
+    const rightCut = centerFreq >= (maxHz - edgeTolHz);
+
+    // apply an envelope to zero-out the cut side smoothly (or hard cut if exactly at edge)
+    for(let i=0;i<bins;i++){
+      // compute freq of bin
+      const freq = minHz + (maxHz - minHz) * (i / Math.max(1, bins - 1));
+      if(leftCut && freq < centerFreq - 1){ amps[i] = 0; }      // fully cut left side
+      if(rightCut && freq > centerFreq + 1){ amps[i] = 0; }     // fully cut right side
+    }
+
+    // convert amps to dB-normalized (0..DB_DISPLAY_CAP) and to pixels
+    const ampsDb = ampsToDbArray(amps);
     const barPixels = new Float32Array(bins);
     for(let i=0;i<bins;i++){
       const dbVal = ampsDb[i];
@@ -1203,60 +1225,56 @@ if(!navigator.bluetooth){
       barPixels[i] = h;
     }
 
-    // draw bars: compute center frequency per bin and map to x using DISPLAY_MIN/MAX
+    // draw bars
     const gap = 2;
     const nominalBarW = Math.max(2, (drawW - (bins - 1) * gap) / bins);
-
     for(let i=0;i<bins;i++){
-      // frequency of bin i according to device range
       const freq = minHz + (maxHz - minHz) * (i / Math.max(1, bins - 1));
       const x = freqToX(freq, leftMargin, drawW);
       const barW = nominalBarW;
       const barH = barPixels[i];
-      const y = 6 + drawH - barH;
+      const y = topMargin + drawH - barH;
 
-      // color ramp like FFT: map amplitude to hue (green->yellow->orange->red)
       const amp = Math.max(0, Math.min(1, amps[i]));
-      // hue 120 -> 0 (green to red)
-      const hue = 120 - Math.floor(120 * amp);
-      const light = 50 + Math.floor(25 * amp);
-      const saturation = 70 + Math.floor(20 * amp);
-      const alpha = 0.6 + 0.35 * amp;
-
-      // further highlight the central bar
       const distFromCenter = Math.abs(i - pos);
-      let fillStyle;
-      if(distFromCenter < 0.6){
-        // bright gold highlight
-        fillStyle = `rgba(255,210,120,${Math.min(1, 0.5 + 0.8*amp)})`;
-      } else {
-        fillStyle = `hsla(${hue}, ${saturation}%, ${light}%, ${alpha})`;
-      }
-      ctx.fillStyle = fillStyle;
 
-      // rounded-top bar
+      // color ramp: green -> yellow -> orange -> red using hue mapping
+      const hue = 120 - Math.floor(120 * amp); // 120(green) to 0(red)
+      const light = 45 + Math.floor(30 * amp);
+      const sat = 70 + Math.floor(20 * amp);
+      const alpha = 0.55 + 0.35 * amp;
+
+      // highlight center
+      let fillColor;
+      if(distFromCenter < 0.6 && amp > 0.2){
+        fillColor = `rgba(255,215,120,${Math.min(1,0.6 + 0.6*amp)})`; // golden highlight
+      } else {
+        fillColor = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+      }
+
+      // draw rounded-top bar
       const bx = x - barW/2;
       const br = Math.min(8, barW/2);
       ctx.beginPath();
       ctx.moveTo(bx + br, y);
       ctx.lineTo(bx + barW - br, y);
       ctx.quadraticCurveTo(bx + barW, y, bx + barW, y + br);
-      ctx.lineTo(bx + barW, 6 + drawH);
-      ctx.lineTo(bx, 6 + drawH);
+      ctx.lineTo(bx + barW, topMargin + drawH);
+      ctx.lineTo(bx, topMargin + drawH);
       ctx.lineTo(bx, y + br);
       ctx.quadraticCurveTo(bx, y, bx + br, y);
       ctx.closePath();
 
-      // slight vertical gradient for more "FFT" depth
-      const grad = ctx.createLinearGradient(0, y, 0, 6 + drawH);
-      grad.addColorStop(0, fillStyle);
+      // gradient fill for depth
+      const grad = ctx.createLinearGradient(0, y, 0, topMargin + drawH);
+      grad.addColorStop(0, fillColor);
       grad.addColorStop(1, "rgba(0,0,0,0.08)");
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // thin bright stroke at top of large bars for crispness
+      // small highlight stroke on top of tall bars
       if(barH > 6){
-        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        ctx.strokeStyle = "rgba(255,255,255,0.06)";
         ctx.lineWidth = 0.8;
         ctx.beginPath();
         ctx.moveTo(bx + 1, y + 1);
@@ -1265,21 +1283,13 @@ if(!navigator.bluetooth){
       }
     }
 
-    // draw light x-axis ticks (no numeric text)
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    ctx.lineWidth = 1;
-    const ticks = [15000,20000,25000,30000,35000,40000,45000,50000,55000,60000,65000,70000];
-    for(const f of ticks){
-      const x = freqToX(f, leftMargin, drawW);
-      ctx.beginPath();
-      ctx.moveTo(x, 6 + drawH);
-      ctx.lineTo(x, 6 + drawH + 6);
-      ctx.stroke();
-    }
+    // show left axis label "dB" and right small legend (no numeric duplication)
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "12px Inter, Arial, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("dB", 8, topMargin);
 
-    // overlay info: show device min/max (kHz), speed ppm and center freq + center db
-    const centerFreq = minHz + (maxHz - minHz) * (pos / Math.max(1, bins - 1));
-    // center db: random between 50 and 80 as requested (gives lively reading)
+    // show small device range + speed + center info; center dB randomized 50..80 as requested
     const centerDb = (50 + Math.random() * 30).toFixed(1);
     infoBar.textContent = `Min: ${(minHz/1000).toFixed(3)} kHz · Max: ${(maxHz/1000).toFixed(3)} kHz · Speed: ${ppm.toFixed(2)} ppm · center ${(centerFreq/1000).toFixed(3)} kHz · ${centerDb} dB`;
 
@@ -1311,14 +1321,12 @@ if(!navigator.bluetooth){
   sigmaSlider.disabled = true;
   toggleBtn.disabled = true;
 
-  // ---------- external API for integration ----------
+  // ---------- external API ----------
   window.__spectrum = {
     setRangeAndPpm: function(min_v, max_v, ppm_v){
-      // update device min/max (Hz)
       const mn = Number(min_v);
       const mx = Number(max_v);
       if(!isNaN(mn) && !isNaN(mx) && mn>0 && mx>0){
-        // handle if values are in kHz (small numbers)
         minHz = (mn < 1000 && mx < 1000) ? mn*1000 : mn;
         maxHz = (mn < 1000 && mx < 1000) ? mx*1000 : mx;
       }
@@ -1345,7 +1353,7 @@ if(!navigator.bluetooth){
     resume: function(){ stopped = false; firstLive = true; stepsSlider.disabled = false; sigmaSlider.disabled = false; toggleBtn.disabled = false; startTime = performance.now(); },
   };
 
-  // try to read any global initial values (non-invasive)
+  // read global initial values if provided externally
   try{
     if(typeof window.min_Hz !== 'undefined' && typeof window.max_Hz !== 'undefined'){
       window.__spectrum.setRangeAndPpm(window.min_Hz, window.max_Hz, window.waveVal || 1.0);

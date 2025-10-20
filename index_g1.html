@@ -204,7 +204,7 @@
             </svg>
             Spectrum analysis
           </div>
-          <canvas id="spectrumCanvas" width="300" height="100" style="width:100%; height:80px; border-radius:8px; background:var(--card); display:block; margin-top:8px;"></canvas>
+          <canvas id="spectrumCanvas" width="300" height="120" style="width:100%; height:100px; border-radius:8px; background:var(--card); display:block; margin-top:8px;"></canvas>
           <div class="sub">FFT-like visualization of ultrasound spectrum</div>
         </div>
 
@@ -589,48 +589,51 @@ function showLive(obj){
 function drawAxes(ctx, canvas) {
   ctx.strokeStyle = '#9fb0c0'; // muted
   ctx.lineWidth = 1;
-  ctx.font = '10px Inter, Arial';
+  ctx.font = '9px Inter, Arial';
   ctx.fillStyle = '#9fb0c0';
 
   // X axis
   ctx.beginPath();
-  ctx.moveTo(0, canvas.height);
-  ctx.lineTo(canvas.width, canvas.height);
+  ctx.moveTo(0, canvas.height - 20);
+  ctx.lineTo(canvas.width, canvas.height - 20);
   ctx.stroke();
 
   // Y axis
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, canvas.height);
+  ctx.moveTo(20, 0);
+  ctx.lineTo(20, canvas.height - 20);
   ctx.stroke();
 
-  // X ticks and labels (15 to 70 kHz)
-  const xTicks = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70];
+  // X ticks and labels (15 to 70 kHz, every 10kHz)
+  const xTicks = [15, 25, 35, 45, 55, 65];
   xTicks.forEach((freq, i) => {
-    const x = (i / (xTicks.length - 1)) * canvas.width;
+    const x = 20 + (i / (xTicks.length - 1)) * (canvas.width - 40);
     ctx.beginPath();
-    ctx.moveTo(x, canvas.height - 3);
-    ctx.lineTo(x, canvas.height + 3);
+    ctx.moveTo(x, canvas.height - 23);
+    ctx.lineTo(x, canvas.height - 17);
     ctx.stroke();
-    ctx.fillText(`${freq}k`, x - 10, canvas.height + 15);
+    ctx.fillText(`${freq}k`, x - 8, canvas.height - 5);
   });
 
   // Y ticks and labels (0 to 100 dB)
   const yTicks = [0, 20, 40, 60, 80, 100];
   yTicks.forEach((db, i) => {
-    const y = canvas.height - (i / (yTicks.length - 1)) * canvas.height;
+    const y = canvas.height - 20 - (i / (yTicks.length - 1)) * (canvas.height - 40);
     ctx.beginPath();
-    ctx.moveTo(-3, y);
-    ctx.lineTo(3, y);
+    ctx.moveTo(17, y);
+    ctx.lineTo(23, y);
     ctx.stroke();
-    ctx.fillText(`${db} dB`, -20, y + 4);
+    ctx.fillText(`${db}dB`, 5, y + 3);
   });
 
-  // Labels
-  ctx.fillText('Frequency (kHz)', canvas.width / 2 - 30, canvas.height + 30);
+  // Overall labels
+  ctx.font = '10px Inter, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Frequency (kHz)', canvas.width / 2, canvas.height + 5);
   ctx.save();
-  ctx.translate(-15, canvas.height / 2);
+  ctx.translate(10, canvas.height / 2 - 10);
   ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
   ctx.fillText('Amplitude (dB)', 0, 0);
   ctx.restore();
 }
@@ -667,9 +670,10 @@ function animateSpectrum() {
   drawAxes(ctx, canvas);
 
   const numBars = 100;
-  const barWidth = canvas.width / numBars;
+  const barWidth = (canvas.width - 40) / numBars;
   const maxDb = 80; // peak at 80 dB
   const sigma = 3; // Gaussian sigma in bar units
+  const plotHeight = canvas.height - 40;
 
   for (let i = 0; i < numBars; i++) {
     const dist = Math.abs(i - clampedBin);
@@ -678,9 +682,9 @@ function animateSpectrum() {
       db = maxDb * Math.exp(- (dist * dist) / (2 * sigma * sigma));
     }
     const heightFraction = db / 100;
-    const height = heightFraction * canvas.height;
-    const x = i * barWidth;
-    const y = canvas.height - height;
+    const height = heightFraction * plotHeight;
+    const x = 20 + i * barWidth;
+    const y = (canvas.height - 20) - height;
     ctx.fillStyle = `hsl(${120 - db}, 70%, 50%)`; // Green to yellow based on db
     ctx.fillRect(x, y, barWidth - 0.5, height);
   }

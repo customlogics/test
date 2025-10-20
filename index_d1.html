@@ -28,7 +28,7 @@
   .small-card{background:var(--card); padding:12px; border-radius:12px; border-left:6px solid var(--accent-2); color:inherit}
 
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
-  .tile{background:var(--card); border-radius:var(--card-radius); padding:18px; position:relative; overflow:hidden; box-shadow:0 6px 20px rgba(3,6,9,0.6);}
+  .tile{background:var(--card); border-radius:var(--card-radius); padding:18px; position:relative; overflow:hidden; box-shadow:0 6px 20px rgba(3,6,9,0.6); min-height: 120px;}
   .tile .heading{font-size:16px;font-weight:800;margin-bottom:8px;color:var(--text);display:flex;align-items:center;gap:10px}
   .tile .sub{color:var(--muted);font-size:13px;margin-top:8px}
   .metric{display:flex;align-items:center;gap:12px}
@@ -83,12 +83,6 @@
     border-radius: 4px;
   }
   
-  .spectrum-controls {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  
   .axis-label {
     position: absolute;
     font-size: 10px;
@@ -117,7 +111,11 @@
   .switch.on .knob{left:27px}
   .modal input[type="range"]{width:100%}
   .muted{color:var(--muted)}
-  @media (max-width:980px){.wrap{grid-template-columns:1fr;padding:12px}.grid{grid-template-columns:1fr}}
+  @media (max-width:980px){
+    .wrap{grid-template-columns:1fr;padding:12px}
+    .grid{grid-template-columns:1fr}
+    .tile{min-height: auto;}
+  }
 </style>
 </head>
 <body>
@@ -268,11 +266,6 @@
               <div>Min: <span id="spectrumMin">--</span> kHz | Max: <span id="spectrumMax">--</span> kHz</div>
               <div>Wave Velocity: <span id="spectrumWave">--</span> PPM | Current: <span id="spectrumCurrent">--</span> kHz</div>
             </div>
-          </div>
-          <div class="spectrum-controls">
-            <button id="spectrumPlay" class="btn-ghost">Play</button>
-            <button id="spectrumPause" class="btn-ghost">Pause</button>
-            <button id="spectrumReset" class="btn-ghost">Reset</button>
           </div>
         </div>
 
@@ -552,9 +545,6 @@ const spectrumMin = document.getElementById("spectrumMin");
 const spectrumMax = document.getElementById("spectrumMax");
 const spectrumWave = document.getElementById("spectrumWave");
 const spectrumCurrent = document.getElementById("spectrumCurrent");
-const spectrumPlay = document.getElementById("spectrumPlay");
-const spectrumPause = document.getElementById("spectrumPause");
-const spectrumReset = document.getElementById("spectrumReset");
 
 /* modal refs */
 const modalBackdrop = document.getElementById('modalBackdrop');
@@ -746,9 +736,10 @@ function updateSpectrumData(liveData) {
     spectrumMax.textContent = spectrumData.maxFreq.toFixed(3);
     spectrumWave.textContent = spectrumData.waveVelocity;
     
-    // If not playing, start with current frequency in the middle
+    // Start spectrum animation automatically when data is available
     if (!spectrumData.isPlaying) {
       spectrumData.currentFreq = (spectrumData.minFreq + spectrumData.maxFreq) / 2;
+      startSpectrumAnimation();
     }
   }
 }
@@ -942,9 +933,6 @@ function startSpectrumAnimation() {
   spectrumData.isPlaying = true;
   spectrumData.lastUpdateTime = 0;
   spectrumAnimationId = requestAnimationFrame(updateSpectrumAnimation);
-  
-  spectrumPlay.disabled = true;
-  spectrumPause.disabled = false;
 }
 
 function stopSpectrumAnimation() {
@@ -953,16 +941,6 @@ function stopSpectrumAnimation() {
     cancelAnimationFrame(spectrumAnimationId);
     spectrumAnimationId = null;
   }
-  
-  spectrumPlay.disabled = false;
-  spectrumPause.disabled = true;
-}
-
-function resetSpectrumAnimation() {
-  stopSpectrumAnimation();
-  spectrumData.currentFreq = (spectrumData.minFreq + spectrumData.maxFreq) / 2;
-  spectrumData.direction = 1;
-  drawSpectrum();
 }
 
 /* write helper with logging */
@@ -1066,6 +1044,15 @@ function onDeviceDisconnected(event) {
 
 async function disconnect() {
   try {
+    // Stop auto live timer before disconnecting
+    if (autoIntervalId) {
+      clearInterval(autoIntervalId);
+      autoIntervalId = null;
+      autoStatus.textContent = "Idle";
+      startAutoBtn.disabled = false;
+      stopAutoBtn.disabled = true;
+    }
+    
     if (device) {
       console.log("Disconnect requested for device:", device.name || device.id);
       if (device.gatt && device.gatt.connected) {
@@ -1152,7 +1139,7 @@ function stopAutoLive(){
   stopAutoBtn.disabled = true;
 }
 
-/* waitForNextInit — used when gear pressed and we need to request INIT and wait for it */
+/* waitForNextInit — used when gear is pressed and we need to request INIT and wait for it */
 function waitForNextInit(timeoutMs = 3000) {
   if (awaitingInitPromise) return awaitingInitPromise;
   let timer;
@@ -1314,11 +1301,6 @@ document.querySelectorAll('.gear').forEach(g => {
     }
   });
 });
-
-/* Spectrum Analysis Controls */
-spectrumPlay.addEventListener('click', startSpectrumAnimation);
-spectrumPause.addEventListener('click', stopSpectrumAnimation);
-spectrumReset.addEventListener('click', resetSpectrumAnimation);
 
 /* Initialize spectrum canvas */
 function initSpectrumCanvas() {

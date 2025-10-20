@@ -14,7 +14,7 @@
     --accent-2: #3b82f6;
     --accent-3: #ff9f6b;
     --accent-4: #9b62ff;
-    --icon-yellow: #FFD54A;    /* only icons + top title use this */
+    --icon-yellow: #FFD54A;
     --glass: rgba(255,255,255,0.03);
     --card-radius: 14px;
   }
@@ -23,7 +23,7 @@
   .wrap{max-width:1120px;margin:18px auto;padding:18px;display:grid;grid-template-columns:360px 1fr;gap:18px;}
   .left{display:flex;flex-direction:column;gap:18px;}
   .hero{background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:var(--card-radius);padding:18px;border-left:6px solid var(--accent-1);}
-  .hero h1{margin:0;font-size:20px;color:var(--icon-yellow)} /* only the top title is yellow */
+  .hero h1{margin:0;font-size:20px;color:var(--icon-yellow)}
   .hero p{margin:8px 0 0 0;color:var(--muted);font-size:13px;}
   .small-card{background:var(--card); padding:12px; border-radius:12px; border-left:6px solid var(--accent-2); color:inherit}
 
@@ -47,7 +47,6 @@
   .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:8px 12px;border-radius:10px;cursor:pointer}
   .badge { display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.02); font-weight:700; color:var(--muted); font-size:13px }
 
-  /* ICONS: doubled to 32px (was 16px), stroke slightly increased */
   .icon { width:32px; height:32px; display:inline-block; vertical-align:middle; }
   svg.icon path, svg.icon rect, svg.icon circle { stroke: var(--icon-yellow); stroke-width:1.6; fill: none; }
   svg.icon rect.filled { fill: var(--icon-yellow); stroke: none; }
@@ -124,7 +123,6 @@
       <div class="grid">
         <div class="tile" id="card_voltage" style="border-left:6px solid var(--accent-1)">
           <div class="heading">
-            <!-- battery icon -->
             <svg class="icon" viewBox="0 0 24 24" aria-hidden>
               <rect x="2" y="6" width="16" height="12" rx="2"></rect>
               <rect class="filled" x="19" y="9" width="2" height="6" rx="0.5"></rect>
@@ -141,7 +139,6 @@
         <!-- CURRENT card -->
         <div class="tile" id="card_current" style="border-left:6px solid #ffcc00">
           <div class="heading">
-            <!-- current icon -->
             <svg class="icon" viewBox="0 0 24 24" aria-hidden>
               <path d="M3 12h7l2 6 2-12 2 6h4"></path>
             </svg>
@@ -197,34 +194,39 @@
           <div class="sub">From LIVE packet</div>
         </div>
 
-        <!-- ===== Integrated Spectrum Tile (placed inline here) ===== -->
-        <div class="tile" id="card_spectrum" style="border-left:6px solid var(--accent-4)">
-          <div class="heading">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden>
-              <path d="M2 12c4 0 4-8 8-8s4 8 8 8 4 8 8 8"></path>
-            </svg>
-            Frequency Spectrum
+        <!-- ===== Integrated Spectrum Tile (inline) ===== -->
+        <div class="tile" id="card_spectrum" style="border-left:6px solid var(--accent-4);">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="heading" style="margin:0;padding:0">Frequency Spectrum</div>
+              <!-- Spread near title (moved here so not cut off) -->
+              <div style="display:flex;align-items:center;gap:6px;margin-left:6px">
+                <div class="small-muted">Spread</div>
+                <input id="spectrumSigma" type="range" min="0.5" max="10" step="0.1" value="5.5" disabled style="width:140px" />
+                <div id="spectrumSigmaLabel" class="small-muted">5.5</div>
+              </div>
+            </div>
+            <div id="spectrumInfo" class="sub" style="margin-left:12px">Waiting for LIVE data — visualizer will start after first LIVE packet.</div>
           </div>
 
-          <canvas id="spectrumCanvas" width="900" height="140" style="width:100%;height:140px;margin-top:8px;border-radius:6px;background:linear-gradient(0deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));"></canvas>
+          <div style="margin-top:8px;display:flex;gap:12px;align-items:flex-start">
+            <!-- Left column for Y-axis labels + canvas -->
+            <div style="flex:1;min-width:0">
+              <canvas id="spectrumCanvas" width="1000" height="200" style="width:100%;height:200px;border-radius:6px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));display:block"></canvas>
+            </div>
+          </div>
 
           <div style="display:flex;gap:12px;align-items:center;margin-top:10px">
             <div style="display:flex;align-items:center;gap:8px">
               <div class="small-muted">Steps</div>
-              <input id="spectrumSteps" type="range" min="2" max="500" step="1" value="100" disabled style="width:160px"/>
-              <div id="spectrumStepsLabel" class="small-muted">100</div>
-            </div>
-
-            <div style="display:flex;align-items:center;gap:8px">
-              <div class="small-muted">Spread</div>
-              <input id="spectrumSigma" type="range" min="0.5" max="10" step="0.1" value="3" disabled style="width:160px"/>
-              <div id="spectrumSigmaLabel" class="small-muted">3.0</div>
+              <input id="spectrumSteps" type="range" min="2" max="500" step="1" value="50" disabled style="width:220px"/>
+              <div id="spectrumStepsLabel" class="small-muted">50</div>
             </div>
 
             <button id="spectrumToggle" class="btn-ghost" disabled style="margin-left:auto">Pause</button>
           </div>
 
-          <div id="spectrumInfo" class="sub" style="margin-top:8px">Waiting for LIVE data — visualizer will start after first LIVE min/max/ppm.</div>
+          <div class="sub" style="margin-top:8px;color:var(--muted)">Y axis: dB (0 → 100). Bars capped at 80 dB. X axis: frequency ticks 15 kHz → 70 kHz.</div>
         </div>
         <!-- ===== End Spectrum Tile ===== -->
 
@@ -431,7 +433,7 @@
 <script>
 /* ==========================
    BLE + parsing + UI JS
-   (behavior unchanged, I only add one integration call in showLive)
+   (keeps original behavior; I added a stop call when disconnecting)
    ========================== */
 
 /* UUIDs & frames */
@@ -444,10 +446,10 @@ const INIT_CMD_HEX = "FD FC FB FA 04 00 49 4E 49 54 04 03 02 01";
 
 /* CMD bytes */
 const CMD_BYTES = {
-  beep: [0x42,0x45,0x45,0x50],     // "BEEP"
-  standby: [0x53,0x54,0x41,0x4E],  // "STAN"
-  shutdown: [0x53,0x48,0x55,0x54], // "SHUT"
-  hiss: [0x48,0x49,0x53,0x53]      // "HISS"
+  beep: [0x42,0x45,0x45,0x50],
+  standby: [0x53,0x54,0x41,0x4E],
+  shutdown: [0x53,0x48,0x55,0x54],
+  hiss: [0x48,0x49,0x53,0x53]
 };
 
 /* DOM refs */
@@ -517,11 +519,7 @@ let currentInitData = null;
 let autoIntervalId = null;
 let writeInProgress = false;
 let editingFeature = null;
-
-/* pendingSave is used for SAVE -> wait for INIT (byte10==1) ACK */
 let pendingSave = null;
-
-/* awaitingInitPromise is used when gear is pressed and we need to request INIT and wait for it */
 let awaitingInitPromise = null;
 
 /* helpers */
@@ -554,7 +552,7 @@ function parseLivePacket(bytes){
     battery_mV: readU16le(buf,10,11),
     current_mA: (() => {
       const raw = readU16le(buf,12,13);
-      return (raw != null) ? (raw/1000) : null; // stored value /1000 => mA
+      return (raw != null) ? (raw/1000) : null;
     })(),
     temp_raw: readU16le(buf,14,15),
     min_Hz: readU16le(buf,16,17),
@@ -582,8 +580,7 @@ function showLive(obj){
   card_days.textContent = (obj.days != null) ? obj.days.toString() + " Days" : "-- Days";
   card_hhmmss.textContent = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "--:--:--";
 
-  // ---------- VISUALIZER INTEGRATION (non-intrusive) ----------
-  // If the visualizer is present, pass min,max,ppm to it. Accepts either Hz or kHz.
+  // visualizer integration (non-intrusive)
   try{
     if(window.__spectrum && typeof window.__spectrum.setRangeAndPpm === 'function'){
       window.__spectrum.setRangeAndPpm(obj.min_Hz, obj.max_Hz, obj.waveVal);
@@ -591,7 +588,7 @@ function showLive(obj){
   }catch(e){ console.warn("spectrum integration error", e); }
 }
 
-/* INIT parsing & display */
+/* INIT parsing & display (unchanged) */
 function parseInitPacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 51) return { error:"INIT too short" };
@@ -753,6 +750,9 @@ function onDeviceDisconnected(event) {
   sendInitBtn.disabled = true;
   startAutoBtn.disabled = true;
   stopAutoBtn.disabled = true;
+
+  // Stop visualizer when device disconnects
+  try{ if(window.__spectrum && typeof window.__spectrum.stop === 'function') window.__spectrum.stop(); }catch(e){console.warn(e);}
 }
 
 async function disconnect() {
@@ -779,10 +779,13 @@ async function disconnect() {
     sendInitBtn.disabled = true;
     startAutoBtn.disabled = true;
     stopAutoBtn.disabled = true;
+
+    // Stop visualizer on user disconnect as well
+    try{ if(window.__spectrum && typeof window.__spectrum.stop === 'function') window.__spectrum.stop(); }catch(e){console.warn(e);}
   }
 }
 
-/* Notify handler: resolves awaitingInitPromise and pendingSave appropriately */
+/* Notify handler */
 function onNotify(ev){
   const arr = new Uint8Array(ev.target.value.buffer);
 
@@ -840,7 +843,7 @@ function stopAutoLive(){
   stopAutoBtn.disabled = true;
 }
 
-/* waitForNextInit — used when gear pressed and we need to request INIT and wait for it */
+/* waitForNextInit */
 function waitForNextInit(timeoutMs = 3000) {
   if (awaitingInitPromise) return awaitingInitPromise;
   let timer;
@@ -858,7 +861,7 @@ function waitForNextInit(timeoutMs = 3000) {
   return awaitingInitPromise;
 }
 
-/* WAIT-for-ACK logic: create pendingSave inside waitForInitAck */
+/* waitForInitAck */
 function waitForInitAck(feature, value, timeoutMs = 5000){
   if(pendingSave) throw new Error("pendingSave already exists");
   return new Promise((resolve, reject) => {
@@ -876,7 +879,7 @@ function waitForInitAck(feature, value, timeoutMs = 5000){
   });
 }
 
-/* build & send save frame, then wait for INIT ack */
+/* performSaveWrite */
 async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   if(!writeChar) throw new Error("Not connected");
   if(writeInProgress) throw new Error("Write in progress");
@@ -898,11 +901,11 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   // write the frame first
   await writeFrame(frame, `SAVE-${featureKey}`);
 
-  // then wait for INIT ack — this will create pendingSave and wait for onNotify to resolve it
+  // then wait for INIT ack
   return waitForInitAck(featureKey, sliderRaw, 5000);
 }
 
-/* modal helpers */
+/* modal helpers & wiring (unchanged) */
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
@@ -944,7 +947,6 @@ modalClose.addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', (ev)=>{ if(ev.target === modalBackdrop) closeModal(); });
 function closeModal(){ modalBackdrop.style.display = 'none'; editingFeature = null; }
 
-/* modal save uses performSaveWrite (which waits for ACK) */
 modalSave.addEventListener('click', async ()=>{
   if(!editingFeature || !currentInitData){ closeModal(); return; }
   if(!writeChar) { alert("Not connected — can't send save command"); return; }
@@ -955,7 +957,6 @@ modalSave.addEventListener('click', async ()=>{
   modalSave.disabled = true; const prevText = modalSave.textContent; modalSave.textContent = "Saving...";
   try{
     await performSaveWrite(editingFeature, enabledNow, sliderRaw);
-    // On ACK success update local model & UI
     if(editingFeature === 'beep'){ currentInitData.beep.enabled = enabledNow===1; currentInitData.beep.value = sliderRaw; }
     else if(editingFeature === 'standby'){ currentInitData.standby.enabled = enabledNow===1; currentInitData.standby.value_mV = sliderRaw; }
     else if(editingFeature === 'shutdown'){ currentInitData.shutdown.enabled = enabledNow===1; currentInitData.shutdown.value_mV = sliderRaw; }
@@ -971,7 +972,7 @@ modalSave.addEventListener('click', async ()=>{
   }
 });
 
-/* gear button wiring */
+/* gear buttons */
 document.querySelectorAll('.gear').forEach(g => {
   g.addEventListener('click', async () => {
     const feature = g.dataset.feature;
@@ -1027,20 +1028,21 @@ if(!navigator.bluetooth){
 }
 </script>
 
-<!-- ===== Spectrum visualizer script (integrated) ===== -->
+<!-- ===== Spectrum visualizer script (integrated, updated per your requests) ===== -->
 <script>
 (function(){
-  // State
-  let bins = 100;
-  let sigma = 3.0;
-  let minHz = 20000;
-  let maxHz = 60000;
+  // ---------- state ----------
+  let bins = 50;              // default steps
+  let sigma = 5.5;            // default spread
+  let minHz = 15000;          // default view range start (Hz)
+  let maxHz = 70000;          // default view range end (Hz)
   let ppm = 1.0;
   let firstLiveReceived = false;
   let running = true;
+  let stopped = false;        // used for disconnect stop
   let startTime = performance.now();
 
-  // DOM
+  // ---------- DOM ----------
   const canvas = document.getElementById('spectrumCanvas');
   const stepsSlider = document.getElementById('spectrumSteps');
   const stepsLabel = document.getElementById('spectrumStepsLabel');
@@ -1050,19 +1052,19 @@ if(!navigator.bluetooth){
   const infoBar = document.getElementById('spectrumInfo');
   const ctx = canvas.getContext('2d');
 
-  // Responsive canvas
+  // pixel ratio and sizing
   function resizeCanvas(){
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth || canvas.width;
     const h = canvas.clientHeight || canvas.height;
-    canvas.width = Math.max(300, Math.floor(w * dpr));
-    canvas.height = Math.max(80, Math.floor(h * dpr));
-    ctx.setTransform(dpr,0,0,dpr,0,0);
+    canvas.width = Math.max(400, Math.floor(w * dpr));
+    canvas.height = Math.max(140, Math.floor(h * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  // Helpers
+  // ---------- helpers ----------
   function trianglePos(progress){
     const t = (progress <= 0.5) ? (progress * 2) : (2 - progress * 2);
     return t * (bins - 1);
@@ -1078,8 +1080,31 @@ if(!navigator.bluetooth){
     return {mn,mx};
   }
 
-  // Draw loop
+  // map normalized amplitude (0..1) to dB (0..80) and then to pixel height relative to 0..100 dB axis
+  const DB_AXIS_MAX = 100;      // axis shows 0..100 dB
+  const DB_DISPLAY_CAP = 80;    // actual max dB produced by signal (cap to 80dB)
+  function ampToDb(ampNormal){
+    // small floor to avoid -inf
+    const val = Math.max(0, ampNormal);
+    return val * DB_DISPLAY_CAP; // linear mapping to 0..80 dB
+  }
+
+  // ---------- draw grid, axes, bars ----------
   function draw(now){
+    // if stopped due to disconnect: draw subtle disabled overlay
+    if(stopped){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "12px Inter, Arial, sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Disconnected — spectrum stopped", 10, canvas.clientHeight/2);
+      requestAnimationFrame(draw);
+      return;
+    }
+
+    // if waiting for live data
     if(!firstLiveReceived){
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.fillStyle = "rgba(255,255,255,0.03)";
@@ -1096,14 +1121,40 @@ if(!navigator.bluetooth){
     const H = canvas.clientHeight;
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
+    // draw Y-axis grid and labels (0..100 dB)
+    const leftMargin = 44; // space for Y labels
+    const bottomMargin = 28; // space for x labels
+    const drawW = W - leftMargin;
+    const drawH = H - bottomMargin;
+
+    // background
+    ctx.fillStyle = "rgba(255,255,255,0.01)";
+    ctx.fillRect(leftMargin, 0, drawW, drawH);
+
+    // horizontal grid lines and labels: 0,20,40,60,80,100
+    ctx.strokeStyle = "rgba(255,255,255,0.04)";
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "11px Inter, Arial, sans-serif";
+    ctx.textBaseline = "middle";
+    for(let d=0; d<=100; d+=20){
+      const y = drawH - (d / DB_AXIS_MAX) * drawH;
+      ctx.beginPath();
+      ctx.moveTo(leftMargin, y);
+      ctx.lineTo(leftMargin + drawW, y);
+      ctx.stroke();
+      // label
+      ctx.fillText(`${d} dB`, 6, y);
+    }
+
+    // compute sweep position
     const effectivePpm = Math.max(0.0001, ppm);
     const cycleMs = 60000 / effectivePpm;
     const elapsed = now - startTime;
     const progress = (elapsed % cycleMs) / cycleMs;
-    const pos = trianglePos(progress);
+    const pos = trianglePos(progress); // 0..bins-1
     const centerFreqHz = minHz + (maxHz - minHz) * (pos / Math.max(1, (bins - 1)));
 
-    // amplitudes
+    // compute amplitudes (Gaussian)
     const amps = new Float32Array(bins);
     let maxAmp = 0;
     for(let i=0;i<bins;i++){
@@ -1111,19 +1162,29 @@ if(!navigator.bluetooth){
       amps[i] = a;
       if(a > maxAmp) maxAmp = a;
     }
-    if(maxAmp > 0) for(let i=0;i<bins;i++) amps[i] /= maxAmp;
+    if(maxAmp > 0){
+      for(let i=0;i<bins;i++) amps[i] /= maxAmp;
+    }
 
-    // draw bars
+    // draw bars mapped to dB, cap to DB_DISPLAY_CAP (80 dB)
     const gap = 2;
-    const barW = Math.max(2, (W - (bins - 1) * gap) / bins);
+    const availableW = drawW - (bins - 1) * gap;
+    const barW = Math.max(2, availableW / bins);
+
     for(let i=0;i<bins;i++){
-      const x = i * (barW + gap);
-      const amp = amps[i];
-      const barH = amp * (H - 10);
-      const y = H - barH;
+      const x = leftMargin + i * (barW + gap);
+      // amplitude to dB
+      let db = ampToDb(amps[i]); // 0..80
+      if(db > DB_DISPLAY_CAP) db = DB_DISPLAY_CAP;
+      // map db (0..DB_AXIS_MAX) to pixel height
+      const hPerc = db / DB_AXIS_MAX; // 0..0.8 if db<=80
+      const barH = hPerc * drawH;
+      const y = drawH - barH;
+
+      // color ramp (center warmer)
       const dist = Math.abs(i - pos) / bins;
-      const alpha = Math.max(0.18, 0.95 * amp);
-      const r = Math.round(255 * (0.9 * amp + 0.1));
+      const alpha = Math.max(0.12, 0.95 * amps[i]);
+      const r = Math.round(255 * (0.9 * amps[i] + 0.1));
       const g = Math.round(170 * (0.3 + 0.7*(1 - dist)));
       const b = Math.round(255 * (0.2 + 0.8*(1 - dist)));
       ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
@@ -1137,53 +1198,81 @@ if(!navigator.bluetooth){
       ctx.moveTo(x + radius, y);
       ctx.lineTo(x + barW - radius, y);
       ctx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
-      ctx.lineTo(x + barW, H);
-      ctx.lineTo(x, H);
+      ctx.lineTo(x + barW, drawH);
+      ctx.lineTo(x, drawH);
       ctx.lineTo(x, y + radius);
       ctx.quadraticCurveTo(x, y, x + radius, y);
       ctx.closePath();
       ctx.fill();
     }
 
-    // overlay info
+    // x-axis ticks: 15kHz to 70kHz (as requested), draw at reasonable spacing
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = "11px Inter, Arial, sans-serif";
+    ctx.textBaseline = "top";
+
+    const xTicks = [15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000, 65000, 70000];
+    for(const fx of xTicks){
+      // map fx to canvas x position using displayed minHz..maxHz range
+      const fxClamped = Math.max(minHz, Math.min(maxHz, fx));
+      const frac = (fxClamped - minHz) / (maxHz - minHz);
+      const x = leftMargin + frac * drawW;
+      // thin tick line
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.beginPath();
+      ctx.moveTo(x, drawH);
+      ctx.lineTo(x, drawH + 6);
+      ctx.stroke();
+      // label (convert to kHz)
+      ctx.fillText(`${(fx/1000).toFixed(0)} kHz`, x - 18, drawH + 8);
+    }
+
+    // small label for current center frequency and display capped dB
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "12px Inter, Arial, sans-serif";
     ctx.textBaseline = "top";
-    const mink = (minHz/1000).toFixed(3);
-    const maxk = (maxHz/1000).toFixed(3);
-    infoBar.textContent = `Min: ${mink} kHz · Max: ${maxk} kHz · Speed: ${ppm.toFixed(2)} ppm`;
-    ctx.fillText(`${(centerFreqHz/1000).toFixed(3)} kHz`, 6, 6);
+    const centerK = (centerFreqHz/1000).toFixed(3);
+    // compute displayed dB at center
+    const centerAmp = amps[Math.round(pos)] || 0;
+    const centerDb = Math.min(DB_DISPLAY_CAP, ampToDb(centerAmp)).toFixed(1);
+    infoBar.textContent = `Min: ${(minHz/1000).toFixed(3)} kHz · Max: ${(maxHz/1000).toFixed(3)} kHz · Speed: ${ppm.toFixed(2)} ppm · center ${centerK} kHz ${centerDb} dB`;
 
     requestAnimationFrame(draw);
   }
+
   requestAnimationFrame(draw);
 
-  // UI wiring
+  // ---------- UI wiring ----------
   stepsSlider.addEventListener('input', ()=>{
-    bins = Math.max(2, Number(stepsSlider.value) || 100);
+    bins = Math.max(2, Number(stepsSlider.value) || 50);
     stepsLabel.textContent = String(bins);
     startTime = performance.now();
     resizeCanvas();
   });
-  sigmaSlider.addEventListener('input', ()=>{ sigma = Math.max(0.5, Number(sigmaSlider.value) || 3.0); sigmaLabel.textContent = sigma.toFixed(2); });
+  sigmaSlider.addEventListener('input', ()=>{
+    sigma = Math.max(0.5, Number(sigmaSlider.value) || 5.5);
+    sigmaLabel.textContent = sigma.toFixed(2);
+  });
   toggleBtn.addEventListener('click', ()=>{
     running = !running;
     toggleBtn.textContent = running ? 'Pause' : 'Resume';
     if(running) startTime = performance.now();
   });
 
-  // start disabled until first LIVE
+  // initial UI defaults and disabled state
+  stepsLabel.textContent = String(bins);
+  sigmaLabel.textContent = sigma.toFixed(2);
   stepsSlider.disabled = true;
   sigmaSlider.disabled = true;
   toggleBtn.disabled = true;
 
-  // Public API to set ranges and ppm (called from showLive)
+  // ---------- public API ----------
   window.__spectrum = {
     setRangeAndPpm: function(min_v, max_v, ppm_v){
       const n = normalizeFreqs(min_v, max_v);
       if(n){ minHz = n.mn; maxHz = n.mx; }
       if(ppm_v != null && !isNaN(Number(ppm_v))) ppm = Number(ppm_v);
-      // treat this as first live if not already
+      // enable on first real live
       if(!firstLiveReceived){
         firstLiveReceived = true;
         stepsSlider.disabled = false;
@@ -1195,17 +1284,20 @@ if(!navigator.bluetooth){
         sigmaLabel.textContent = sigma.toFixed(2);
         infoBar.textContent = `Min: ${(minHz/1000).toFixed(3)} kHz · Max: ${(maxHz/1000).toFixed(3)} kHz · Speed: ${ppm.toFixed(2)} ppm`;
         startTime = performance.now();
+        stopped = false;
         setTimeout(resizeCanvas,50);
       } else {
-        // subsequent updates: just update values and reset timebase
+        // subsequent updates: update values and reset timebase
         startTime = performance.now();
       }
     },
     setSteps: function(s){ bins = Math.max(2, Number(s)||bins); stepsSlider.value = bins; stepsLabel.textContent = String(bins); },
-    setSigma: function(s){ sigma = Math.max(0.5, Number(s)||sigma); sigmaSlider.value = sigma; sigmaLabel.textContent = sigma.toFixed(2); }
+    setSigma: function(s){ sigma = Math.max(0.5, Number(s)||sigma); sigmaSlider.value = sigma; sigmaLabel.textContent = sigma.toFixed(2); },
+    stop: function(){ stopped = true; firstLiveReceived = false; stepsSlider.disabled = true; sigmaSlider.disabled = true; toggleBtn.disabled = true; infoBar.textContent = "Disconnected — visualizer stopped."; },
+    resume: function(){ stopped = false; firstLiveReceived = true; stepsSlider.disabled = false; sigmaSlider.disabled = false; toggleBtn.disabled = false; startTime = performance.now(); },
   };
 
-  // Try to pick up values on startup if already present globally
+  // attempt pick up existing global values (non-invasive)
   try{
     if(typeof window.min_Hz !== 'undefined' && typeof window.max_Hz !== 'undefined'){
       const n = normalizeFreqs(window.min_Hz, window.max_Hz);
@@ -1214,9 +1306,7 @@ if(!navigator.bluetooth){
     if(typeof window.waveVal !== 'undefined') ppm = Number(window.waveVal) || ppm;
   }catch(e){ /* ignore */ }
 
-  // initial labels
-  stepsLabel.textContent = String(bins);
-  sigmaLabel.textContent = sigma.toFixed(2);
+  // autosize
   setTimeout(resizeCanvas, 120);
 })();
 </script>

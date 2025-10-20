@@ -123,6 +123,7 @@
       <div class="grid">
         <div class="tile" id="card_voltage" style="border-left:6px solid var(--accent-1)">
           <div class="heading">
+            <!-- battery icon -->
             <svg class="icon" viewBox="0 0 24 24" aria-hidden>
               <rect x="2" y="6" width="16" height="12" rx="2"></rect>
               <rect class="filled" x="19" y="9" width="2" height="6" rx="0.5"></rect>
@@ -139,6 +140,7 @@
         <!-- CURRENT card -->
         <div class="tile" id="card_current" style="border-left:6px solid #ffcc00">
           <div class="heading">
+            <!-- current icon -->
             <svg class="icon" viewBox="0 0 24 24" aria-hidden>
               <path d="M3 12h7l2 6 2-12 2 6h4"></path>
             </svg>
@@ -194,12 +196,12 @@
           <div class="sub">From LIVE packet</div>
         </div>
 
-        <!-- ===== Integrated Spectrum Tile (inline) ===== -->
+        <!-- ===== Integrated Spectrum Tile ===== -->
         <div class="tile" id="card_spectrum" style="border-left:6px solid var(--accent-4);">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <div style="display:flex;align-items:center;gap:10px">
               <div class="heading" style="margin:0;padding:0">Frequency Spectrum</div>
-              <!-- Spread near title (moved here so not cut off) -->
+              <!-- Spread near title -->
               <div style="display:flex;align-items:center;gap:6px;margin-left:6px">
                 <div class="small-muted">Spread</div>
                 <input id="spectrumSigma" type="range" min="0.5" max="10" step="0.1" value="5.5" disabled style="width:140px" />
@@ -210,9 +212,8 @@
           </div>
 
           <div style="margin-top:8px;display:flex;gap:12px;align-items:flex-start">
-            <!-- Left column for Y-axis labels + canvas -->
             <div style="flex:1;min-width:0">
-              <canvas id="spectrumCanvas" width="1000" height="200" style="width:100%;height:200px;border-radius:6px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));display:block"></canvas>
+              <canvas id="spectrumCanvas" width="1000" height="220" style="width:100%;height:220px;border-radius:6px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));display:block"></canvas>
             </div>
           </div>
 
@@ -225,8 +226,6 @@
 
             <button id="spectrumToggle" class="btn-ghost" disabled style="margin-left:auto">Pause</button>
           </div>
-
-          <div class="sub" style="margin-top:8px;color:var(--muted)">Y axis: dB (0 → 100). Bars capped at 80 dB. X axis: frequency ticks 15 kHz → 70 kHz.</div>
         </div>
         <!-- ===== End Spectrum Tile ===== -->
 
@@ -432,8 +431,7 @@
 
 <script>
 /* ==========================
-   BLE + parsing + UI JS
-   (keeps original behavior; I added a stop call when disconnecting)
+   BLE + parsing + UI JS (unchanged behaviour)
    ========================== */
 
 /* UUIDs & frames */
@@ -667,7 +665,7 @@ async function writeFrame(bytes, label){
 async function sendLiveCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(LIVE_CMD_HEX); await writeFrame(d, "LIVE"); }
 async function sendInitCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(INIT_CMD_HEX); await writeFrame(d, "INIT"); }
 
-/* Robust connect/disconnect */
+/* connect/disconnect (stops spectrum on disconnect) */
 async function connect() {
   console.log("Connect button clicked");
   if (!navigator.bluetooth) {
@@ -843,7 +841,7 @@ function stopAutoLive(){
   stopAutoBtn.disabled = true;
 }
 
-/* waitForNextInit */
+/* waitForNextInit & waitForInitAck & performSaveWrite (unchanged) */
 function waitForNextInit(timeoutMs = 3000) {
   if (awaitingInitPromise) return awaitingInitPromise;
   let timer;
@@ -860,8 +858,6 @@ function waitForNextInit(timeoutMs = 3000) {
   });
   return awaitingInitPromise;
 }
-
-/* waitForInitAck */
 function waitForInitAck(feature, value, timeoutMs = 5000){
   if(pendingSave) throw new Error("pendingSave already exists");
   return new Promise((resolve, reject) => {
@@ -878,8 +874,6 @@ function waitForInitAck(feature, value, timeoutMs = 5000){
     };
   });
 }
-
-/* performSaveWrite */
 async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   if(!writeChar) throw new Error("Not connected");
   if(writeInProgress) throw new Error("Write in progress");
@@ -898,14 +892,11 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
 
   console.log(`TX SAVE [${featureKey}] (EN=${enabledNow}) : ${bytesToHexUpper(frame)}`);
 
-  // write the frame first
   await writeFrame(frame, `SAVE-${featureKey}`);
-
-  // then wait for INIT ack
   return waitForInitAck(featureKey, sliderRaw, 5000);
 }
 
-/* modal helpers & wiring (unchanged) */
+/* modal wiring (unchanged) */
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
@@ -1028,18 +1019,23 @@ if(!navigator.bluetooth){
 }
 </script>
 
-<!-- ===== Spectrum visualizer script (integrated, updated per your requests) ===== -->
+<!-- ===== Spectrum visualizer (updated) ===== -->
 <script>
 (function(){
+  // ---------- constants / defaults ----------
+  const DISPLAY_MIN_HZ = 15000;  // fixed display axis start
+  const DISPLAY_MAX_HZ = 70000;  // fixed display axis end
+  const DB_AXIS_MAX = 100;       // axis 0..100 dB shown
+  const DB_DISPLAY_CAP = 80;     // max dB displayed for bars
+
   // ---------- state ----------
-  let bins = 50;              // default steps
-  let sigma = 5.5;            // default spread
-  let minHz = 15000;          // default view range start (Hz)
-  let maxHz = 70000;          // default view range end (Hz)
+  let bins = 50;
+  let sigma = 5.5;
+  let minHz = 15000;
+  let maxHz = 70000;
   let ppm = 1.0;
-  let firstLiveReceived = false;
-  let running = true;
-  let stopped = false;        // used for disconnect stop
+  let firstLive = false;
+  let stopped = false;
   let startTime = performance.now();
 
   // ---------- DOM ----------
@@ -1052,67 +1048,84 @@ if(!navigator.bluetooth){
   const infoBar = document.getElementById('spectrumInfo');
   const ctx = canvas.getContext('2d');
 
-  // pixel ratio and sizing
-  function resizeCanvas(){
+  // ---------- sizing ----------
+  function resize(){
     const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth || canvas.width;
-    const h = canvas.clientHeight || canvas.height;
-    canvas.width = Math.max(400, Math.floor(w * dpr));
-    canvas.height = Math.max(140, Math.floor(h * dpr));
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cw = canvas.clientWidth || canvas.width;
+    const ch = canvas.clientHeight || canvas.height;
+    canvas.width = Math.max(400, Math.floor(cw * dpr));
+    canvas.height = Math.max(180, Math.floor(ch * dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
   }
-  window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
+  window.addEventListener('resize', resize);
+  resize();
 
   // ---------- helpers ----------
-  function trianglePos(progress){
-    const t = (progress <= 0.5) ? (progress * 2) : (2 - progress * 2);
-    return t * (bins - 1);
-  }
   function gaussian(x, mu, s){
     const v = (x - mu) / s;
     return Math.exp(-0.5 * v * v);
   }
-  function normalizeFreqs(a,b){
-    let mn = Number(a), mx = Number(b);
-    if(isNaN(mn) || isNaN(mx)) return null;
-    if(mn < 1000 && mx < 1000){ mn *= 1000; mx *= 1000; } // treat as kHz
-    return {mn,mx};
+  function trianglePos(progress, binsCount){
+    const t = (progress <= 0.5) ? (progress * 2) : (2 - progress * 2);
+    return t * (binsCount - 1);
   }
 
-  // map normalized amplitude (0..1) to dB (0..80) and then to pixel height relative to 0..100 dB axis
-  const DB_AXIS_MAX = 100;      // axis shows 0..100 dB
-  const DB_DISPLAY_CAP = 80;    // actual max dB produced by signal (cap to 80dB)
-  function ampToDb(ampNormal){
-    // small floor to avoid -inf
-    const val = Math.max(0, ampNormal);
-    return val * DB_DISPLAY_CAP; // linear mapping to 0..80 dB
+  // Convert amplitude (0..1) to "log dB" using 20*log10, then normalize dynamic range to 0..DB_DISPLAY_CAP
+  function ampsToDbArray(amps){
+    const eps = 1e-6;
+    const raw = new Float32Array(amps.length);
+    let maxRaw = -Infinity, minRaw = Infinity;
+    for(let i=0;i<amps.length;i++){
+      const a = Math.max(eps, amps[i]);
+      const db = 20 * Math.log10(a); // negative numbers (<=0)
+      raw[i] = db;
+      if(db > maxRaw) maxRaw = db;
+      if(db < minRaw) minRaw = db;
+    }
+    // if all equal (rare), set range
+    if(maxRaw === minRaw){
+      minRaw = maxRaw - 60; // arbitrary 60 dB spread
+    }
+    // normalize raw to 0..DB_DISPLAY_CAP
+    const out = new Float32Array(amps.length);
+    for(let i=0;i<amps.length;i++){
+      out[i] = (raw[i] - minRaw) / (maxRaw - minRaw) * DB_DISPLAY_CAP;
+      if(out[i] < 0) out[i] = 0;
+      if(out[i] > DB_DISPLAY_CAP) out[i] = DB_DISPLAY_CAP;
+    }
+    return out;
   }
 
-  // ---------- draw grid, axes, bars ----------
+  // map a frequency (Hz) in DISPLAY_MIN_HZ..DISPLAY_MAX_HZ to pixel x
+  function freqToX(freq, left, width){
+    const f = Math.max(DISPLAY_MIN_HZ, Math.min(DISPLAY_MAX_HZ, freq));
+    const frac = (f - DISPLAY_MIN_HZ) / (DISPLAY_MAX_HZ - DISPLAY_MIN_HZ);
+    return left + frac * width;
+  }
+
+  // ---------- draw loop ----------
   function draw(now){
-    // if stopped due to disconnect: draw subtle disabled overlay
+    // stopped overlay
     if(stopped){
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.fillStyle = "rgba(0,0,0,0.25)";
       ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
-      ctx.font = "12px Inter, Arial, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "13px Inter, Arial, sans-serif";
       ctx.textBaseline = "middle";
-      ctx.fillText("Disconnected — spectrum stopped", 10, canvas.clientHeight/2);
+      ctx.fillText("Disconnected — spectrum stopped", 12, canvas.clientHeight/2);
       requestAnimationFrame(draw);
       return;
     }
 
-    // if waiting for live data
-    if(!firstLiveReceived){
+    if(!firstLive){
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.fillStyle = "rgba(255,255,255,0.03)";
       ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
-      ctx.font = "12px Inter, Arial, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "13px Inter, Arial, sans-serif";
       ctx.textBaseline = "middle";
-      ctx.fillText("Waiting for LIVE min/max/ppm...", 10, canvas.clientHeight/2);
+      ctx.fillText("Waiting for LIVE min/max/ppm...", 12, canvas.clientHeight/2);
       requestAnimationFrame(draw);
       return;
     }
@@ -1121,40 +1134,38 @@ if(!navigator.bluetooth){
     const H = canvas.clientHeight;
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // draw Y-axis grid and labels (0..100 dB)
-    const leftMargin = 44; // space for Y labels
-    const bottomMargin = 28; // space for x labels
-    const drawW = W - leftMargin;
-    const drawH = H - bottomMargin;
+    // layout margins
+    const leftMargin = 48;
+    const bottomMargin = 36;
+    const drawW = W - leftMargin - 12;
+    const drawH = H - bottomMargin - 8;
 
     // background
     ctx.fillStyle = "rgba(255,255,255,0.01)";
-    ctx.fillRect(leftMargin, 0, drawW, drawH);
+    ctx.fillRect(leftMargin, 6, drawW, drawH);
 
-    // horizontal grid lines and labels: 0,20,40,60,80,100
+    // Y grid lines and labels (0,20,40,60,80,100)
     ctx.strokeStyle = "rgba(255,255,255,0.04)";
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
     ctx.font = "11px Inter, Arial, sans-serif";
     ctx.textBaseline = "middle";
     for(let d=0; d<=100; d+=20){
-      const y = drawH - (d / DB_AXIS_MAX) * drawH;
+      const y = 6 + drawH - (d / DB_AXIS_MAX) * drawH;
       ctx.beginPath();
       ctx.moveTo(leftMargin, y);
       ctx.lineTo(leftMargin + drawW, y);
       ctx.stroke();
-      // label
       ctx.fillText(`${d} dB`, 6, y);
     }
 
-    // compute sweep position
-    const effectivePpm = Math.max(0.0001, ppm);
-    const cycleMs = 60000 / effectivePpm;
+    // compute progress & center pos
+    const effPpm = Math.max(0.0001, ppm);
+    const cycleMs = 60000 / effPpm;
     const elapsed = now - startTime;
     const progress = (elapsed % cycleMs) / cycleMs;
-    const pos = trianglePos(progress); // 0..bins-1
-    const centerFreqHz = minHz + (maxHz - minHz) * (pos / Math.max(1, (bins - 1)));
+    const pos = trianglePos(progress, bins); // 0..bins-1
 
-    // compute amplitudes (Gaussian)
+    // build amplitudes (Gaussian) across device minHz..maxHz bins
     const amps = new Float32Array(bins);
     let maxAmp = 0;
     for(let i=0;i<bins;i++){
@@ -1162,26 +1173,32 @@ if(!navigator.bluetooth){
       amps[i] = a;
       if(a > maxAmp) maxAmp = a;
     }
-    if(maxAmp > 0){
-      for(let i=0;i<bins;i++) amps[i] /= maxAmp;
+    if(maxAmp > 0) for(let i=0;i<bins;i++) amps[i] /= maxAmp;
+
+    // map amps to dB logarithmically & capped to DB_DISPLAY_CAP, then to pixels (0..drawH)
+    const ampsDb = ampsToDbArray(amps); // 0..DB_DISPLAY_CAP
+    // map each to pixel height relative to DB_AXIS_MAX
+    const barPixels = new Float32Array(bins);
+    for(let i=0;i<bins;i++){
+      const dbVal = ampsDb[i];
+      const h = (dbVal / DB_AXIS_MAX) * drawH;
+      barPixels[i] = h;
     }
 
-    // draw bars mapped to dB, cap to DB_DISPLAY_CAP (80 dB)
+    // draw bars: for each bin compute its center frequency and map to x using DISPLAY_MIN/MAX
     const gap = 2;
-    const availableW = drawW - (bins - 1) * gap;
-    const barW = Math.max(2, availableW / bins);
+    // we want bars to not overlap; compute nominal bar width from available drawW and bins but because x positions are irregular with freq mapping, we approximate width
+    const nominalBarW = Math.max(2, (drawW - (bins - 1) * gap) / bins);
 
     for(let i=0;i<bins;i++){
-      const x = leftMargin + i * (barW + gap);
-      // amplitude to dB
-      let db = ampToDb(amps[i]); // 0..80
-      if(db > DB_DISPLAY_CAP) db = DB_DISPLAY_CAP;
-      // map db (0..DB_AXIS_MAX) to pixel height
-      const hPerc = db / DB_AXIS_MAX; // 0..0.8 if db<=80
-      const barH = hPerc * drawH;
-      const y = drawH - barH;
+      // frequency of bin i according to device range
+      const freq = minHz + (maxHz - minHz) * (i / Math.max(1, bins - 1));
+      const x = freqToX(freq, leftMargin, drawW);
+      const barW = nominalBarW;
+      const barH = barPixels[i];
+      const y = 6 + drawH - barH;
 
-      // color ramp (center warmer)
+      // color ramp
       const dist = Math.abs(i - pos) / bins;
       const alpha = Math.max(0.12, 0.95 * amps[i]);
       const r = Math.round(255 * (0.9 * amps[i] + 0.1));
@@ -1192,54 +1209,45 @@ if(!navigator.bluetooth){
         ctx.fillStyle = `rgba(255,210,120,${Math.max(0.5, alpha)})`;
       }
 
-      // rounded rect bar
-      const radius = Math.min(6, barW/2);
+      // draw rectangle centered on x with width barW
+      const bx = x - barW/2;
+      const br = Math.min(6, barW/2);
       ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.lineTo(x + barW - radius, y);
-      ctx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
-      ctx.lineTo(x + barW, drawH);
-      ctx.lineTo(x, drawH);
-      ctx.lineTo(x, y + radius);
-      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.moveTo(bx + br, y);
+      ctx.lineTo(bx + barW - br, y);
+      ctx.quadraticCurveTo(bx + barW, y, bx + barW, y + br);
+      ctx.lineTo(bx + barW, 6 + drawH);
+      ctx.lineTo(bx, 6 + drawH);
+      ctx.lineTo(bx, y + br);
+      ctx.quadraticCurveTo(bx, y, bx + br, y);
       ctx.closePath();
       ctx.fill();
     }
 
-    // x-axis ticks: 15kHz to 70kHz (as requested), draw at reasonable spacing
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    // draw x-axis ticks fixed from DISPLAY_MIN_HZ..DISPLAY_MAX_HZ
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
     ctx.font = "11px Inter, Arial, sans-serif";
     ctx.textBaseline = "top";
-
-    const xTicks = [15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000, 65000, 70000];
-    for(const fx of xTicks){
-      // map fx to canvas x position using displayed minHz..maxHz range
-      const fxClamped = Math.max(minHz, Math.min(maxHz, fx));
-      const frac = (fxClamped - minHz) / (maxHz - minHz);
-      const x = leftMargin + frac * drawW;
-      // thin tick line
+    const ticks = [15000,20000,25000,30000,35000,40000,45000,50000,55000,60000,65000,70000];
+    for(const f of ticks){
+      const x = freqToX(f, leftMargin, drawW);
       ctx.strokeStyle = "rgba(255,255,255,0.06)";
       ctx.beginPath();
-      ctx.moveTo(x, drawH);
-      ctx.lineTo(x, drawH + 6);
+      ctx.moveTo(x, 6 + drawH);
+      ctx.lineTo(x, 6 + drawH + 6);
       ctx.stroke();
-      // label (convert to kHz)
-      ctx.fillText(`${(fx/1000).toFixed(0)} kHz`, x - 18, drawH + 8);
+      ctx.fillText(`${(f/1000).toFixed(0)} kHz`, x - 18, 6 + drawH + 8);
     }
 
-    // small label for current center frequency and display capped dB
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.font = "12px Inter, Arial, sans-serif";
-    ctx.textBaseline = "top";
-    const centerK = (centerFreqHz/1000).toFixed(3);
-    // compute displayed dB at center
-    const centerAmp = amps[Math.round(pos)] || 0;
-    const centerDb = Math.min(DB_DISPLAY_CAP, ampToDb(centerAmp)).toFixed(1);
-    infoBar.textContent = `Min: ${(minHz/1000).toFixed(3)} kHz · Max: ${(maxHz/1000).toFixed(3)} kHz · Speed: ${ppm.toFixed(2)} ppm · center ${centerK} kHz ${centerDb} dB`;
+    // overlay info: show device min/max (kHz), speed ppm and center freq + dB
+    const centerFreq = minHz + (maxHz - minHz) * (pos / Math.max(1, bins - 1));
+    // center db approximate from nearest bin
+    const centerIdx = Math.round(pos);
+    const centerDb = Math.min(DB_DISPLAY_CAP, ampsToDbArray(new Float32Array([amps[centerIdx]]))[0]).toFixed(1);
+    infoBar.textContent = `Min: ${(minHz/1000).toFixed(3)} kHz · Max: ${(maxHz/1000).toFixed(3)} kHz · Speed: ${ppm.toFixed(2)} ppm · center ${(centerFreq/1000).toFixed(3)} kHz · ${centerDb} dB`;
 
     requestAnimationFrame(draw);
   }
-
   requestAnimationFrame(draw);
 
   // ---------- UI wiring ----------
@@ -1247,34 +1255,40 @@ if(!navigator.bluetooth){
     bins = Math.max(2, Number(stepsSlider.value) || 50);
     stepsLabel.textContent = String(bins);
     startTime = performance.now();
-    resizeCanvas();
+    resize();
   });
   sigmaSlider.addEventListener('input', ()=>{
     sigma = Math.max(0.5, Number(sigmaSlider.value) || 5.5);
     sigmaLabel.textContent = sigma.toFixed(2);
   });
   toggleBtn.addEventListener('click', ()=>{
-    running = !running;
-    toggleBtn.textContent = running ? 'Pause' : 'Resume';
-    if(running) startTime = performance.now();
+    stopped = !stopped;
+    toggleBtn.textContent = stopped ? 'Resume' : 'Pause';
+    if(!stopped) startTime = performance.now();
   });
 
-  // initial UI defaults and disabled state
+  // defaults + disabled until first live
   stepsLabel.textContent = String(bins);
   sigmaLabel.textContent = sigma.toFixed(2);
   stepsSlider.disabled = true;
   sigmaSlider.disabled = true;
   toggleBtn.disabled = true;
 
-  // ---------- public API ----------
+  // ---------- external API for integration ----------
   window.__spectrum = {
     setRangeAndPpm: function(min_v, max_v, ppm_v){
-      const n = normalizeFreqs(min_v, max_v);
-      if(n){ minHz = n.mn; maxHz = n.mx; }
+      // update device min/max (Hz)
+      const mn = Number(min_v);
+      const mx = Number(max_v);
+      if(!isNaN(mn) && !isNaN(mx) && mn>0 && mx>0){
+        // handle if values are in kHz (small numbers)
+        minHz = (mn < 1000 && mx < 1000) ? mn*1000 : mn;
+        maxHz = (mn < 1000 && mx < 1000) ? mx*1000 : mx;
+      }
       if(ppm_v != null && !isNaN(Number(ppm_v))) ppm = Number(ppm_v);
-      // enable on first real live
-      if(!firstLiveReceived){
-        firstLiveReceived = true;
+      if(!firstLive){
+        firstLive = true;
+        stopped = false;
         stepsSlider.disabled = false;
         sigmaSlider.disabled = false;
         toggleBtn.disabled = false;
@@ -1282,35 +1296,29 @@ if(!navigator.bluetooth){
         sigmaSlider.value = sigma;
         stepsLabel.textContent = String(bins);
         sigmaLabel.textContent = sigma.toFixed(2);
-        infoBar.textContent = `Min: ${(minHz/1000).toFixed(3)} kHz · Max: ${(maxHz/1000).toFixed(3)} kHz · Speed: ${ppm.toFixed(2)} ppm`;
         startTime = performance.now();
-        stopped = false;
-        setTimeout(resizeCanvas,50);
+        setTimeout(resize,50);
       } else {
-        // subsequent updates: update values and reset timebase
         startTime = performance.now();
       }
     },
     setSteps: function(s){ bins = Math.max(2, Number(s)||bins); stepsSlider.value = bins; stepsLabel.textContent = String(bins); },
     setSigma: function(s){ sigma = Math.max(0.5, Number(s)||sigma); sigmaSlider.value = sigma; sigmaLabel.textContent = sigma.toFixed(2); },
-    stop: function(){ stopped = true; firstLiveReceived = false; stepsSlider.disabled = true; sigmaSlider.disabled = true; toggleBtn.disabled = true; infoBar.textContent = "Disconnected — visualizer stopped."; },
-    resume: function(){ stopped = false; firstLiveReceived = true; stepsSlider.disabled = false; sigmaSlider.disabled = false; toggleBtn.disabled = false; startTime = performance.now(); },
+    stop: function(){ stopped = true; firstLive = false; stepsSlider.disabled = true; sigmaSlider.disabled = true; toggleBtn.disabled = true; infoBar.textContent = "Disconnected — visualizer stopped."; },
+    resume: function(){ stopped = false; firstLive = true; stepsSlider.disabled = false; sigmaSlider.disabled = false; toggleBtn.disabled = false; startTime = performance.now(); },
   };
 
-  // attempt pick up existing global values (non-invasive)
+  // try to read any global initial values (non-invasive)
   try{
     if(typeof window.min_Hz !== 'undefined' && typeof window.max_Hz !== 'undefined'){
-      const n = normalizeFreqs(window.min_Hz, window.max_Hz);
-      if(n){ minHz = n.mn; maxHz = n.mx; }
+      window.__spectrum.setRangeAndPpm(window.min_Hz, window.max_Hz, window.waveVal || 1.0);
     }
-    if(typeof window.waveVal !== 'undefined') ppm = Number(window.waveVal) || ppm;
   }catch(e){ /* ignore */ }
 
-  // autosize
-  setTimeout(resizeCanvas, 120);
+  setTimeout(resize,120);
 })();
 </script>
-<!-- ===== End Spectrum visualizer script ===== -->
+<!-- ===== End Spectrum visualizer ===== -->
 
 </body>
 </html>

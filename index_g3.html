@@ -63,21 +63,6 @@
   .modal input[type="range"]{width:100%}
   .muted{color:var(--muted)}
   @media (max-width:980px){.wrap{grid-template-columns:1fr;padding:12px}.grid{grid-template-columns:1fr}}
-
-  #spectrumText {
-    font-family: 'Courier New', monospace;
-    font-size: 9px;
-    line-height: 1;
-    white-space: pre;
-    color: var(--muted);
-    background: var(--glass);
-    padding: 8px;
-    border-radius: 8px;
-    margin-top: 8px;
-    height: 140px;
-    overflow: auto;
-    border: 1px solid rgba(255,255,255,0.03);
-  }
 </style>
 </head>
 <body>
@@ -219,7 +204,7 @@
             </svg>
             Spectrum analysis
           </div>
-          <pre id="spectrumText">Spectrum idle - send LIVE to animate</pre>
+          <canvas id="spectrumCanvas" style="width:100%; height:160px; border-radius:8px; background:var(--card); display:block; margin-top:8px;"></canvas>
         </div>
 
         <div class="tile" id="card_pattern" style="border-left:6px solid var(--accent-2)">
@@ -459,7 +444,6 @@ const deviceName = document.getElementById("deviceName");
 const bleText = document.getElementById("bleText");
 const statusDot = document.getElementById("statusDot");
 const autoStatus = document.getElementById("autoStatus");
-const spectrumText = document.getElementById("spectrumText");
 
 /* LIVE card elements */
 const card_battery = document.getElementById("card_battery");
@@ -600,77 +584,92 @@ function showLive(obj){
   }
 }
 
-/* Text-based Spectrum animation */
-function generateAsciiSpectrum(currentFreq, maxDb) {
-  const width = 70; // total width including labels
-  const plotWidth = width - 8; // space for y-axis and margin
-  const height = 18; // plot height
-  const minViz = 15000;
-  const maxViz = 70000;
-  const range = maxViz - minViz;
-  const bin = Math.floor(((currentFreq - minViz) / range) * (plotWidth - 1));
-  const sigma = 2.5;
+/* Spectrum animation with high-DPI support */
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.imageSmoothingEnabled = false;
+  return ctx;
+}
 
-  // Create grid
-  let grid = Array.from({length: height}, () => ' '.repeat(width));
+function drawAxes(ctx, canvasWidth, canvasHeight) {
+  const marginLeft = 55;
+  const marginBottom = 45;
+  const plotWidth = canvasWidth - marginLeft;
+  const plotHeight = canvasHeight - marginBottom;
 
-  // Y-axis
-  for (let row = 0; row < height; row++) {
-    grid[row] = '|' + grid[row].slice(1);
-  }
+  ctx.strokeStyle = '#9fb0c0'; // muted
+  ctx.lineWidth = 1;
+  ctx.font = 'bold 12px Inter, Arial'; // Use bold for crisper text
+  ctx.fillStyle = '#9fb0c0';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle'; // Better alignment
 
-  // X-axis
-  const xAxisRow = height - 1;
-  let xAxis = '-'.repeat(plotWidth) + ' '.repeat(8);
-  grid[xAxisRow] = grid[xAxisRow].slice(0, 1) + xAxis.slice(1);
+  // X axis
+  const xAxisY = canvasHeight - marginBottom;
+  ctx.beginPath();
+  ctx.moveTo(marginLeft, xAxisY);
+  ctx.lineTo(canvasWidth, xAxisY);
+  ctx.stroke();
 
-  // Gaussian peak
-  for (let col = 0; col < plotWidth; col++) {
-    const dist = Math.abs(col - bin);
-    let db = dist < 12 ? maxDb * Math.exp(- (dist ** 2) / (2 * sigma ** 2)) : 0;
-    const barHeight = Math.floor((db / 100) * (height - 1));
-    for (let row = 0; row < barHeight; row++) {
-      const charIndex = 1 + col; // after y-axis
-      const currentChar = grid[height - 1 - row][charIndex];
-      if (currentChar === ' ') {
-        grid[height - 1 - row] = grid[height - 1 - row].slice(0, charIndex) + '#' + grid[height - 1 - row].slice(charIndex + 1);
-      }
-    }
-  }
+  // Y axis
+  ctx.beginPath();
+  ctx.moveTo(marginLeft, 0);
+  ctx.lineTo(marginLeft, xAxisY);
+  ctx.stroke();
 
-  // Y labels (0 to 100 dB)
-  const yTicks = [0, 25, 50, 75, 100];
-  yTicks.forEach((tick, i) => {
-    const row = height - 1 - Math.floor((tick / 100) * (height - 1));
-    if (row >= 0 && row < height) {
-      const label = tick.toString().padStart(3);
-      grid[row] = label + grid[row].slice(3);
-    }
+  // X ticks and labels (15 to 70 kHz)
+  const xTicks = [15, 25, 35, 45, 55, 65, 70];
+  xTicks.forEach((freq, i) => {
+    const x = marginLeft + (i / (xTicks.length - 1)) * plotWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, xAxisY);
+    ctx.lineTo(x, xAxisY + 5);
+    ctx.stroke();
+    // Shift last label slightly left to avoid cutoff
+    const labelX = (i === xTicks.length - 1) ? x - 8 : x;
+    ctx.fillText(`${freq} kHz`, labelX, xAxisY + 20);
   });
 
-  // X labels (15 to 70 kHz, simplified)
-  const xLabels = ['15k', '25k', '35k', '45k', '55k', '65k', '70k'];
-  const labelRow = height;
-  let xLabelLine = ' '.repeat(4) + xLabels.map((label, i) => {
-    const pos = 1 + Math.floor((i / (xLabels.length - 1)) * (plotWidth - 1));
-    return ' '.repeat(Math.max(0, pos - (label.length / 2 + (i ? 4 : 0)))) + label;
-  }).join(' ');
-  grid.push(xLabelLine.slice(0, width));
+  // Y ticks and labels (0 to 100 dB)
+  const yTicks = [0, 20, 40, 60, 80, 100];
+  yTicks.forEach((db, i) => {
+    const y = xAxisY - (i / (yTicks.length - 1)) * plotHeight;
+    ctx.beginPath();
+    ctx.moveTo(marginLeft - 5, y);
+    ctx.lineTo(marginLeft, y);
+    ctx.stroke();
+    ctx.textAlign = 'right';
+    ctx.fillText(`${db} dB`, marginLeft - 10, y + 4);
+    ctx.textAlign = 'center';
+  });
 
-  // Title and amplitude label
-  grid.unshift('Amplitude (dB) ^');
-  grid.unshift('Frequency (kHz) > Spectrum Analysis');
-
-  // Join to text
-  return grid.join('\n');
+  // Overall labels
+  ctx.font = 'bold 12px Inter, Arial';
+  ctx.fillText('Frequency (kHz)', canvasWidth / 2, canvasHeight - 5);
+  ctx.save();
+  ctx.translate(marginLeft / 2, canvasHeight / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Amplitude (dB)', 0, 0);
+  ctx.restore();
 }
 
 function animateSpectrum() {
   if (!isAnimating || currentWavePpm <= 0 || currentMinHz >= currentMaxHz) {
     isAnimating = false;
-    spectrumText.textContent = 'Spectrum idle - send LIVE to animate';
     return;
   }
+
+  const canvas = document.getElementById('spectrumCanvas');
+  const ctx = setupCanvas(canvas); // Setup high-DPI each frame for resize handling
+  const canvasWidth = canvas.width / (window.devicePixelRatio || 1);
+  const canvasHeight = canvas.height / (window.devicePixelRatio || 1);
 
   const now = performance.now();
   const elapsedSeconds = (now - animationStartTime) / 1000;
@@ -684,9 +683,41 @@ function animateSpectrum() {
   }
 
   const currentFreq = currentMinHz + fraction * (currentMaxHz - currentMinHz);
-  const maxDb = 50 + Math.random() * 30; // Random between 50-80 dB
 
-  spectrumText.textContent = generateAsciiSpectrum(currentFreq, maxDb);
+  // Map to bar index (100 bars, 15-70 kHz)
+  const minViz = 15000;
+  const maxViz = 70000;
+  const bin = Math.floor(((currentFreq - minViz) / (maxViz - minViz)) * 99);
+  const clampedBin = Math.max(0, Math.min(99, bin));
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const marginLeft = 55;
+  const marginBottom = 45;
+  const plotWidth = canvasWidth - marginLeft;
+  const plotHeight = canvasHeight - marginBottom;
+  const xAxisY = canvasHeight - marginBottom;
+
+  drawAxes(ctx, canvasWidth, canvasHeight);
+
+  const numBars = 100;
+  const barWidth = plotWidth / numBars;
+  const maxDb = 50 + Math.random() * 30; // Random between 50-80 dB
+  const sigma = 3; // Gaussian sigma in bar units
+
+  for (let i = 0; i < numBars; i++) {
+    const dist = Math.abs(i - clampedBin);
+    let db = 0;
+    if (dist < 15) { // Limit computation
+      db = maxDb * Math.exp(- (dist * dist) / (2 * sigma * sigma));
+    }
+    const heightFraction = db / 100;
+    const height = heightFraction * plotHeight;
+    const x = marginLeft + i * barWidth;
+    const y = xAxisY - height;
+    ctx.fillStyle = `hsl(${120 - db}, 70%, 50%)`; // Green to yellow based on db
+    ctx.fillRect(x, y, barWidth - 0.5, height);
+  }
 
   requestAnimationFrame(animateSpectrum);
 }

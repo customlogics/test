@@ -506,8 +506,8 @@ let pendingSave = null;
 let awaitingInitPromise = null;
 
 /* Spectrum animation state */
-let currentMinHz = 0;
-let currentMaxHz = 0;
+let currentMinHz = 15000; // default 15kHz
+let currentMaxHz = 70000; // default 70kHz
 let currentWavePpm = 0;
 let animationStartTime = performance.now();
 let isAnimating = false;
@@ -563,16 +563,18 @@ function showLive(obj){
   card_battery.textContent = (obj.battery_mV != null) ? (obj.battery_mV/1000).toFixed(3) + " V" : "-- V";
   card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(3) + " mA" : "-- mA";
   card_temp_value.textContent = (obj.temp_raw != null) ? (obj.temp_raw/100).toFixed(2) + " °C" : "-- °C";
-  card_minfreq.textContent = (obj.min_Hz != null) ? (obj.min_Hz/1000).toFixed(3) + " kHz" : "-- kHz";
-  card_maxfreq.textContent = (obj.max_Hz != null) ? (obj.max_Hz/1000).toFixed(3) + " kHz" : "-- kHz";
+  const minHz = obj.min_Hz != null ? Math.max(15000, obj.min_Hz) : 15000;
+  const maxHz = obj.max_Hz != null ? Math.min(70000, obj.max_Hz) : 70000;
+  card_minfreq.textContent = (minHz / 1000).toFixed(1) + " kHz";
+  card_maxfreq.textContent = (maxHz / 1000).toFixed(1) + " kHz";
   card_waveval.textContent = (obj.waveVal != null) ? obj.waveVal.toString() : "--";
   card_pattern_val.textContent = (obj.pattern != null) ? obj.pattern.toString() : "--";
   card_days.textContent = (obj.days != null) ? obj.days.toString() + " Days" : "-- Days";
   card_hhmmss.textContent = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "--:--:--";
 
   /* Update spectrum data */
-  if (obj.min_Hz != null) currentMinHz = obj.min_Hz;
-  if (obj.max_Hz != null) currentMaxHz = obj.max_Hz;
+  if (obj.min_Hz != null) currentMinHz = Math.max(15000, obj.min_Hz);
+  if (obj.max_Hz != null) currentMaxHz = Math.min(70000, obj.max_Hz);
   if (obj.waveVal != null) {
     currentWavePpm = obj.waveVal;
     if (!isAnimating && currentWavePpm > 0) {
@@ -584,8 +586,57 @@ function showLive(obj){
 }
 
 /* Spectrum animation */
+function drawAxes(ctx, canvas) {
+  ctx.strokeStyle = '#9fb0c0'; // muted
+  ctx.lineWidth = 1;
+  ctx.font = '10px Inter, Arial';
+  ctx.fillStyle = '#9fb0c0';
+
+  // X axis
+  ctx.beginPath();
+  ctx.moveTo(0, canvas.height);
+  ctx.lineTo(canvas.width, canvas.height);
+  ctx.stroke();
+
+  // Y axis
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, canvas.height);
+  ctx.stroke();
+
+  // X ticks and labels (15 to 70 kHz)
+  const xTicks = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70];
+  xTicks.forEach((freq, i) => {
+    const x = (i / (xTicks.length - 1)) * canvas.width;
+    ctx.beginPath();
+    ctx.moveTo(x, canvas.height - 3);
+    ctx.lineTo(x, canvas.height + 3);
+    ctx.stroke();
+    ctx.fillText(`${freq}k`, x - 10, canvas.height + 15);
+  });
+
+  // Y ticks and labels (0 to 100 dB)
+  const yTicks = [0, 20, 40, 60, 80, 100];
+  yTicks.forEach((db, i) => {
+    const y = canvas.height - (i / (yTicks.length - 1)) * canvas.height;
+    ctx.beginPath();
+    ctx.moveTo(-3, y);
+    ctx.lineTo(3, y);
+    ctx.stroke();
+    ctx.fillText(`${db} dB`, -20, y + 4);
+  });
+
+  // Labels
+  ctx.fillText('Frequency (kHz)', canvas.width / 2 - 30, canvas.height + 30);
+  ctx.save();
+  ctx.translate(-15, canvas.height / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Amplitude (dB)', 0, 0);
+  ctx.restore();
+}
+
 function animateSpectrum() {
-  if (!isAnimating || currentWavePpm <= 0) {
+  if (!isAnimating || currentWavePpm <= 0 || currentMinHz >= currentMaxHz) {
     isAnimating = false;
     return;
   }
@@ -594,32 +645,44 @@ function animateSpectrum() {
   const elapsedSeconds = (now - animationStartTime) / 1000;
   const cyclesPerSecond = currentWavePpm / 60;
   const cycleProgress = (elapsedSeconds * cyclesPerSecond) % 1;
-  let pos;
+  let fraction;
   if (cycleProgress < 0.5) {
-    pos = 2 * cycleProgress;
+    fraction = 2 * cycleProgress;
   } else {
-    pos = 2 * (1 - cycleProgress);
+    fraction = 2 * (1 - cycleProgress);
   }
-  const currentBin = Math.floor(pos * 99);
+
+  const currentFreq = currentMinHz + fraction * (currentMaxHz - currentMinHz);
+
+  // Map to bar index (100 bars, 15-70 kHz)
+  const minViz = 15000;
+  const maxViz = 70000;
+  const bin = Math.floor(((currentFreq - minViz) / (maxViz - minViz)) * 99);
+  const clampedBin = Math.max(0, Math.min(99, bin));
 
   const canvas = document.getElementById('spectrumCanvas');
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const barWidth = canvas.width / 100;
-  const maxHeight = canvas.height;
-  const sigma = 5; // Gaussian sigma for peak width
+  drawAxes(ctx, canvas);
 
-  for (let i = 0; i < 100; i++) {
-    const dist = Math.abs(i - currentBin);
-    let amp = 0;
-    if (dist < 20) { // Limit computation
-      amp = Math.exp(- (dist * dist) / (2 * sigma * sigma));
+  const numBars = 100;
+  const barWidth = canvas.width / numBars;
+  const maxDb = 80; // peak at 80 dB
+  const sigma = 3; // Gaussian sigma in bar units
+
+  for (let i = 0; i < numBars; i++) {
+    const dist = Math.abs(i - clampedBin);
+    let db = 0;
+    if (dist < 15) { // Limit computation
+      db = maxDb * Math.exp(- (dist * dist) / (2 * sigma * sigma));
     }
-    const height = amp * maxHeight;
+    const heightFraction = db / 100;
+    const height = heightFraction * canvas.height;
     const x = i * barWidth;
-    ctx.fillStyle = '#27b56b'; // accent-1 green
-    ctx.fillRect(x, canvas.height - height, barWidth - 0.5, height);
+    const y = canvas.height - height;
+    ctx.fillStyle = `hsl(${120 - db}, 70%, 50%)`; // Green to yellow based on db
+    ctx.fillRect(x, y, barWidth - 0.5, height);
   }
 
   requestAnimationFrame(animateSpectrum);
@@ -777,6 +840,8 @@ async function connect() {
 function onDeviceDisconnected(event) {
   const dev = event?.target;
   console.log("Device disconnected:", dev ? (dev.name || dev.id) : dev);
+  stopAutoLive();
+  isAnimating = false;
   deviceName.textContent = "Not connected";
   bleText.textContent = "Disconnected";
   statusDot.style.background = "#ff6b6b";
@@ -787,12 +852,11 @@ function onDeviceDisconnected(event) {
   sendInitBtn.disabled = true;
   startAutoBtn.disabled = true;
   stopAutoBtn.disabled = true;
-
-  /* Stop spectrum animation on disconnect */
-  isAnimating = false;
 }
 
 async function disconnect() {
+  stopAutoLive();
+  isAnimating = false;
   try {
     if (device) {
       console.log("Disconnect requested for device:", device.name || device.id);
@@ -816,9 +880,6 @@ async function disconnect() {
     sendInitBtn.disabled = true;
     startAutoBtn.disabled = true;
     stopAutoBtn.disabled = true;
-
-    /* Stop spectrum animation on disconnect */
-    isAnimating = false;
   }
 }
 

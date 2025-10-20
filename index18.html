@@ -1001,5 +1001,246 @@ if(!navigator.bluetooth){
   stopAutoBtn.disabled = true;
 }
 </script>
+  <!-- BEGIN: Spectrum visualizer injection (paste before </body>) -->
+<style id="fft-inject-styles">
+  /* minimal styles to avoid touching other page CSS */
+  #fft-inject-wrap{max-width:100%;margin:12px 0;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px;border-left:6px solid #9b62ff;font-family:Inter,Arial,sans-serif;color:#e6eef6}
+  #fft-inject-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  #fft-inject-canvas{width:100%;height:140px;display:block;background:linear-gradient(0deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border-radius:6px}
+  #fft-inject-controls{display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  #fft-inject-controls .label{color:#9aa4b2;font-size:13px}
+  #fft-inject-controls input[type=range]{width:180px}
+  #fft-inject-info{color:#9aa4b2;font-size:13px;margin-left:auto}
+  @media (max-width:640px){ #fft-inject-controls input[type=range]{width:120px} }
+</style>
+
+<div id="fft-inject-wrap" aria-live="polite" title="Spectral visualizer injected by helper script">
+  <div id="fft-inject-head">
+    <div style="font-weight:600">Spectrum Visualization</div>
+    <div id="fft-inject-info">Min: -- · Max: -- · Speed: -- ppm</div>
+  </div>
+  <canvas id="fft-inject-canvas" width="900" height="140"></canvas>
+  <div id="fft-inject-controls">
+    <div class="label">Steps</div>
+    <input id="fft-steps" type="range" min="2" max="500" value="100" step="1" />
+    <div id="fft-steps-label" class="label">100</div>
+
+    <div class="label">Spread</div>
+    <input id="fft-sigma" type="range" min="0.5" max="10" value="3" step="0.1" />
+    <div id="fft-sigma-label" class="label">3.0</div>
+
+    <button id="fft-toggle" style="margin-left:8px;padding:6px 10px;border-radius:6px;border:0;background:#9b62ff;color:#071022;cursor:pointer">Pause</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // --- configuration / state ---
+  let bins = 100;            // dynamic, controlled by slider
+  let sigma = 3.0;           // gaussian spread
+  let minHz = 20000;         // Hz
+  let maxHz = 60000;         // Hz
+  let ppm = 1.0;             // pulses per minute => full min->max->min cycle in 60000/ppm ms
+  let running = true;
+  let startTime = performance.now();
+
+  // --- create references to injected DOM ---
+  const container = document.getElementById('fft-inject-wrap');
+  const canvas = document.getElementById('fft-inject-canvas');
+  const stepsSlider = document.getElementById('fft-steps');
+  const stepsLabel = document.getElementById('fft-steps-label');
+  const sigmaSlider = document.getElementById('fft-sigma');
+  const sigmaLabel = document.getElementById('fft-sigma-label');
+  const toggleBtn = document.getElementById('fft-toggle');
+  const info = document.getElementById('fft-inject-info');
+  const ctx = canvas.getContext('2d');
+
+  // responsive canvas sizing
+  function resizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || canvas.width;
+    const h = canvas.clientHeight || canvas.height;
+    canvas.width = Math.max(300, Math.floor(w * dpr));
+    canvas.height = Math.max(80, Math.floor(h * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // triangle position utility: progress 0..1 => pos 0..bins-1..0
+  function trianglePos(progress){
+    const t = (progress <= 0.5) ? (progress*2) : (2 - progress*2);
+    return t * (bins - 1);
+  }
+
+  function gaussian(x, mu, s){
+    const v = (x - mu) / s;
+    return Math.exp(-0.5 * v * v);
+  }
+
+  // draw loop
+  function draw(now){
+    if(!running){ requestAnimationFrame(draw); return; }
+
+    const W = canvas.clientWidth;
+    const H = canvas.clientHeight;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // cycle duration in ms: 60000 / ppm
+    const effectivePpm = Math.max(0.0001, ppm);
+    const cycleMs = 60000 / effectivePpm;
+    const elapsed = now - startTime;
+    const progress = (elapsed % cycleMs) / cycleMs; // 0..1
+    const pos = trianglePos(progress);              // 0..bins-1 (float)
+    const centerFreqHz = minHz + (maxHz - minHz) * (pos / Math.max(1, (bins - 1)));
+
+    // calculate amplitudes
+    const amps = new Float32Array(bins);
+    let maxAmp = 0;
+    for(let i=0;i<bins;i++){
+      const a = gaussian(i, pos, sigma);
+      amps[i] = a;
+      if(a > maxAmp) maxAmp = a;
+    }
+    if(maxAmp > 0){
+      for(let i=0;i<bins;i++) amps[i] /= maxAmp;
+    }
+
+    // draw bars
+    const gap = 2;
+    const barW = Math.max(2, (W - (bins - 1) * gap) / bins);
+    for(let i=0;i<bins;i++){
+      const x = i * (barW + gap);
+      const amp = amps[i];
+      const barH = amp * (H - 10);
+      const y = H - barH;
+
+      const dist = Math.abs(i - pos) / (bins);
+      const alpha = Math.max(0.18, 0.95 * amp);
+      const r = Math.round(255 * (0.9 * amp + 0.1));
+      const g = Math.round(170 * (0.3 + 0.7*(1 - dist)));
+      const b = Math.round(255 * (0.2 + 0.8*(1 - dist)));
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      if(Math.abs(i - pos) < 0.5){
+        ctx.fillStyle = `rgba(255,210,120,${Math.max(0.5, alpha)})`;
+      }
+
+      // rounded-rectangle bar
+      const radius = Math.min(6, barW/2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + barW - radius, y);
+      ctx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
+      ctx.lineTo(x + barW, H);
+      ctx.lineTo(x, H);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // overlay info text and update small infobar
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "12px Inter, Arial, sans-serif";
+    ctx.textBaseline = "top";
+    const mink = (minHz/1000).toFixed(3);
+    const maxk = (maxHz/1000).toFixed(3);
+    info.textContent = `Min: ${mink} kHz · Max: ${maxk} kHz · Speed: ${ppm.toFixed(2)} ppm`;
+    ctx.fillText(`${(centerFreqHz/1000).toFixed(3)} kHz`, 6, 6);
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  // handle UI interactions
+  stepsSlider.addEventListener('input', ()=>{
+    bins = Math.max(2, Number(stepsSlider.value) || 100);
+    stepsLabel.textContent = String(bins);
+    // reset time base for smoother motion
+    startTime = performance.now();
+  });
+  sigmaSlider.addEventListener('input', ()=>{
+    sigma = Math.max(0.5, Number(sigmaSlider.value) || 3.0);
+    sigmaLabel.textContent = sigma.toFixed(2);
+  });
+  toggleBtn.addEventListener('click', ()=>{
+    running = !running;
+    toggleBtn.textContent = running ? 'Pause' : 'Resume';
+    if(running) { startTime = performance.now(); }
+  });
+
+  // responsive initial labels
+  stepsLabel.textContent = String(bins);
+  sigmaLabel.textContent = sigma.toFixed(2);
+
+  // adapt to different units: accept kHz or Hz
+  function normalizeFreqs(a,b){
+    let mn = Number(a);
+    let mx = Number(b);
+    if(isNaN(mn) || isNaN(mx)) return null;
+    // if both < 1000 assume values are kHz — convert to Hz
+    if(mn < 1000 && mx < 1000){ mn *= 1000; mx *= 1000; }
+    return {mn, mx};
+  }
+
+  // --- integrate with existing showLive without altering behaviour ---
+  // If a showLive exists, wrap it; otherwise define it.
+  const originalShowLive = window.showLive && typeof window.showLive === 'function' ? window.showLive : null;
+  window.showLive = function(obj){
+    try{
+      // call original if present (preserve existing behavior)
+      if(originalShowLive) {
+        try{ originalShowLive(obj); } catch(e){ console.warn('original showLive threw',e); }
+      }
+      if(!obj) return;
+      // try to read min & max & waveVal from obj with common keys
+      const maybeMin = obj.min_Hz ?? obj.minHz ?? obj.min ?? obj.min_freq ?? null;
+      const maybeMax = obj.max_Hz ?? obj.maxHz ?? obj.max ?? obj.max_freq ?? null;
+      const maybeWave = obj.waveVal ?? obj.wave_val ?? obj.wave ?? obj.ppm ?? obj.speed ?? null;
+
+      const normalized = normalizeFreqs(maybeMin, maybeMax);
+      if(normalized){
+        minHz = normalized.mn;
+        maxHz = normalized.mx;
+      }
+      if(maybeWave != null && !isNaN(Number(maybeWave))) {
+        ppm = Number(maybeWave) || ppm;
+      }
+      // reset timebase so visual syncs to new wave
+      startTime = performance.now();
+      // no other UI changes are made here to avoid interfering with your page
+    }catch(e){ console.warn('fft-inject showLive error', e); }
+  };
+
+  // also expose a direct setter if you need to call it from other code:
+  window.__fft_inject = {
+    setRangeAndPpm: function(min_v, max_v, ppm_v){
+      const normalized = normalizeFreqs(min_v, max_v);
+      if(normalized){
+        minHz = normalized.mn;
+        maxHz = normalized.mx;
+      }
+      if(ppm_v != null && !isNaN(Number(ppm_v))) ppm = Number(ppm_v);
+      startTime = performance.now();
+    },
+    setSteps: function(s){ bins = Math.max(2, Number(s)||bins); stepsSlider.value = bins; stepsLabel.textContent = String(bins); },
+    setSigma: function(s){ sigma = Math.max(0.5, Number(s)||sigma); sigmaSlider.value = sigma; sigmaLabel.textContent = sigma.toFixed(2); }
+  };
+
+  // if your page already has values (global variables), try to pick them up now quietly:
+  try{
+    if(typeof window.min_Hz !== 'undefined' && typeof window.max_Hz !== 'undefined'){
+      const n = normalizeFreqs(window.min_Hz, window.max_Hz);
+      if(n) { minHz = n.mn; maxHz = n.mx; }
+    }
+    if(typeof window.waveVal !== 'undefined') ppm = Number(window.waveVal) || ppm;
+  }catch(e){ /* ignore */ }
+
+  // autosize once
+  setTimeout(resizeCanvas, 120);
+})();
+</script>
+<!-- END: Spectrum visualizer injection -->
+
 </body>
 </html>

@@ -212,9 +212,9 @@
             Spectrum analysis
           </div>
           <div class="radio-group">
-            <input type="radio" id="modeFft" name="spectrumMode" checked>
+            <input type="radio" id="modeFft" name="spectrumMode">
             <label for="modeFft">FFT</label>
-            <input type="radio" id="modeWaterfall" name="spectrumMode">
+            <input type="radio" id="modeWaterfall" name="spectrumMode" checked>
             <label for="modeWaterfall">Waterfall</label>
           </div>
           <canvas id="spectrumCanvas"></canvas>
@@ -423,7 +423,7 @@
 <script>
 /* ==========================
    BLE + parsing + UI JS
-   (behavior unchanged — only spectrum/waterfall drawing changed)
+   (behavior unchanged — only small spectrum/waterfall adjustments requested)
    ========================== */
 
 /* UUIDs & frames */
@@ -524,7 +524,8 @@ let currentMaxHz = 70000; // default 70kHz
 let currentWavePpm = 0;
 let animationStartTime = performance.now();
 let isAnimating = false;
-let currentMode = 'fft';
+// 1) Make waterfall default
+let currentMode = 'waterfall';
 let waterfallLines = [];
 
 /* helpers */
@@ -678,13 +679,9 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
 
 /* Map dB/amplitude to a visually pleasing color (bright burst palette) */
 function mapDbToColor(db) {
-  // db expected 0..100 (but we use only up to ~80)
-  // produce a warm-to-cool burst: near-center -> yellow/white, mid->magenta/cyan ring, low->deep green/teal
   const v = Math.max(0, Math.min(1, db / 100));
-  // center brightness
   const bright = Math.min(1, v * 1.4);
-  // hue sweep - we'll bias toward cyan/green for lower, through yellow to magenta for stronger peaks
-  const h = 180 - (v * 160); // 180 (cyan) down to ~20 (orange)
+  const h = 180 - (v * 160);
   const s = 80 + v * 20;
   const l = 30 + bright * 35;
   return `hsl(${h}, ${s}%, ${l}%)`;
@@ -698,15 +695,13 @@ function generateSpectrumLine(clampedBin) {
   const line = new Array(numBars).fill(0);
   for (let i = 0; i < numBars; i++) {
     const dist = Math.abs(i - clampedBin);
-    // exponential falloff (sharper than gaussian)
     const val = maxDb * Math.exp(- decay * dist);
-    // clamp small noise floor
     line[i] = (val < 0.4) ? 0 : val;
   }
   return line;
 }
 
-/* Main animation loop: draws FFT bars or waterfall, with bluish background and color burst */
+/* Main animation loop: draws FFT bars or waterfall, with requested tweaks */
 function animateSpectrum() {
   if (!isAnimating || currentWavePpm <= 0 || currentMinHz >= currentMaxHz) {
     isAnimating = false;
@@ -714,7 +709,7 @@ function animateSpectrum() {
   }
 
   const canvas = document.getElementById('spectrumCanvas');
-  const ctx = setupCanvas(canvas); // Setup high-DPI each frame for resize handling
+  const ctx = setupCanvas(canvas);
   const dpr = window.devicePixelRatio || 1;
   const canvasWidth = canvas.width / dpr;
   const canvasHeight = canvas.height / dpr;
@@ -733,30 +728,37 @@ function animateSpectrum() {
   const currentFreq = currentMinHz + fraction * (currentMaxHz - currentMinHz);
 
   // Map to bar index (100 bars). Use slight margin to prevent hard cut at edges.
-  const minViz = 14000; // left margin smaller than 15000 so min freq doesn't sit exactly on index 0
-  const maxViz = 71000; // right margin slightly larger than 70000 so max freq has a little bleed
+  const minViz = 14000;
+  const maxViz = 71000;
   const numBars = 100;
   const bin = Math.floor(((currentFreq - minViz) / (maxViz - minViz)) * (numBars - 1));
   const clampedBin = Math.max(0, Math.min(numBars - 1, bin));
 
-  // DRAW BACKGROUND: bluish gradient like your attached image
+  // DRAW BACKGROUND
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, canvasHeight);
-  bgGrad.addColorStop(0, '#021f33');  // deep navy-teal
-  bgGrad.addColorStop(1, '#06293f');  // slightly brighter bottom
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // lightly add horizontal noise stripes (subtle)
-  ctx.save();
-  ctx.globalAlpha = 0.05;
-  for (let i = 0; i < 6; i++) {
-    const y = (i / 6) * canvasHeight;
-    ctx.fillRect(0, y, canvasWidth, 1);
+  if (currentMode === 'waterfall') {
+    // 3) Use exact rgba = 0000aaff -> rgba(0,0,170,1)
+    ctx.fillStyle = 'rgba(0,0,170,1)';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // very subtle horizontal stripes for texture
+    ctx.save();
+    ctx.globalAlpha = 0.03;
+    for (let i = 0; i < 6; i++) {
+      const y = (i / 6) * canvasHeight;
+      ctx.fillRect(0, y, canvasWidth, 1);
+    }
+    ctx.restore();
+  } else {
+    // keep previous gradient for fft mode
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+    bgGrad.addColorStop(0, '#021f33');
+    bgGrad.addColorStop(1, '#06293f');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
   }
-  ctx.restore();
 
-  // plot region metrics
   const marginLeft = 55;
   const marginBottom = 45;
   const plotWidth = canvasWidth - marginLeft;
@@ -768,7 +770,6 @@ function animateSpectrum() {
   drawAxes(ctx, canvasWidth, canvasHeight);
 
   if (currentMode === 'fft') {
-    // FFT style bars (sharp exponential falloff)
     const maxDb = 50 + Math.random() * 30;
     const decay = 0.5 + Math.random() * 0.8;
     for (let i = 0; i < numBars; i++) {
@@ -783,18 +784,18 @@ function animateSpectrum() {
       ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), height);
     }
 
-    // center spot burst
+    // Dimmer center spot (2) — reduced alpha and radius
     const centerX = marginLeft + clampedBin * barWidth + barWidth / 2;
     const centerY = xAxisY - (Math.min(1, (maxDb/100)) * plotHeight) * 0.6;
-    const radial = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(10, barWidth * 10));
-    radial.addColorStop(0, 'rgba(255,255,220,0.95)');
-    radial.addColorStop(0.12, 'rgba(255,200,120,0.85)');
-    radial.addColorStop(0.28, 'rgba(140,220,255,0.35)');
+    const radial = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(6, barWidth * 6));
+    radial.addColorStop(0, 'rgba(255,255,220,0.45)');
+    radial.addColorStop(0.12, 'rgba(255,200,120,0.30)');
+    radial.addColorStop(0.28, 'rgba(140,220,255,0.18)');
     radial.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = radial;
     ctx.beginPath();
-    ctx.arc(centerX, centerY, Math.max(12, barWidth * 10), 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, Math.max(8, barWidth * 6), 0, Math.PI * 2);
     ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
 
@@ -802,38 +803,32 @@ function animateSpectrum() {
     const lineHeight = 1;
     const maxLines = Math.floor(plotHeight / lineHeight);
 
-    // Generate new line using exponential falloff
     const newLine = generateSpectrumLine(clampedBin);
 
-    // Prepend newest line to top (so older lines go down)
     waterfallLines.unshift(newLine);
     if (waterfallLines.length > maxLines) waterfallLines.pop();
 
-    // Draw lines top->down
     for (let ly = 0; ly < waterfallLines.length; ly++) {
       const line = waterfallLines[ly];
       const y = ly * lineHeight;
       for (let i = 0; i < numBars; i++) {
         const db = line[i];
         if (!db) continue;
-        // make edges slightly darker for depth
-        const color = mapDbToColor(db);
-        ctx.fillStyle = color;
+        ctx.fillStyle = mapDbToColor(db);
         const x = marginLeft + i * barWidth;
         ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), lineHeight);
       }
 
-      // for the line that contains the main peak, draw a glow/burst centered at clampedBin
+      // Dimmer burst on newest line: smaller radius and lower alpha
       if (ly === 0) {
-        // newest line: bright burst
         const centerX = marginLeft + clampedBin * barWidth + barWidth / 2;
         const centerY = y + (lineHeight / 2);
-        const burstR = Math.max(10, barWidth * 10);
+        const burstR = Math.max(8, barWidth * 6); // smaller than before
         const radial = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, burstR);
-        radial.addColorStop(0, 'rgba(255,255,240,0.95)');
-        radial.addColorStop(0.08, 'rgba(255,220,140,0.85)');
-        radial.addColorStop(0.24, 'rgba(130,230,255,0.55)');
-        radial.addColorStop(0.5, 'rgba(10,120,120,0.12)');
+        radial.addColorStop(0, 'rgba(255,255,240,0.45)');
+        radial.addColorStop(0.08, 'rgba(255,220,140,0.28)');
+        radial.addColorStop(0.24, 'rgba(130,230,255,0.18)');
+        radial.addColorStop(0.5, 'rgba(10,120,120,0.06)');
         radial.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = radial;
@@ -1291,7 +1286,7 @@ document.getElementById('copyParsed').addEventListener('click', async ()=>{
 });
 document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
-/* Spectrum mode switching */
+/* Spectrum mode switching: keep handlers but ensure currentMode set by default to waterfall */
 modeFft.addEventListener('change', () => {
   if (modeFft.checked) {
     currentMode = 'fft';

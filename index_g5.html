@@ -524,7 +524,6 @@ let animationStartTime = performance.now();
 let isAnimating = false;
 let currentMode = 'waterfall';
 let waterfallLines = [];
-let highlightUntil = 0;
 
 /* helpers */
 function hexToBytes(hexStr){
@@ -591,7 +590,6 @@ function showLive(obj){
   if (obj.max_Hz != null) currentMaxHz = Math.min(70000, obj.max_Hz);
   if (obj.waveVal != null) {
     currentWavePpm = obj.waveVal;
-    highlightUntil = performance.now() + 500;
     if (!isAnimating && currentWavePpm > 0) {
       isAnimating = true;
       animationStartTime = performance.now();
@@ -718,7 +716,7 @@ function animateSpectrum() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (currentMode === 'waterfall') {
-    ctx.fillStyle = 'rgba(0,0,170,1)';
+    ctx.fillStyle = '#14202a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
@@ -747,8 +745,8 @@ function animateSpectrum() {
       const x = marginLeft + i * barWidth;
       const y = xAxisY - height;
       let hue = 120 - db;
-      if (i === clampedBin && now < highlightUntil) {
-        hue = 60;
+      if (dist < 15) {
+        hue = 0 + 240 * fraction;
       }
       ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
       ctx.fillRect(x, y, barWidth - 0.5, height);
@@ -763,20 +761,24 @@ function animateSpectrum() {
     const newLine = generateSpectrumLine(clampedBin, plotWidth);
 
     // Add to buffer
-    waterfallLines.unshift(newLine);
+    waterfallLines.unshift({line: newLine, fraction: fraction, bin: clampedBin});
     if (waterfallLines.length > maxLines) {
       waterfallLines.pop();
     }
 
     // Draw lines
     for (let ly = 0; ly < waterfallLines.length; ly++) {
-      const line = waterfallLines[ly];
+      const entry = waterfallLines[ly];
+      const line = entry.line;
+      const savedFraction = entry.fraction;
+      const savedBin = entry.bin;
       const y = ly * lineHeight;
       for (let i = 0; i < numBars; i++) {
         const db = line[i];
         let hue = 120 - db;
-        if (ly === 0 && i === clampedBin && now < highlightUntil) {
-          hue = 60;
+        const dist = Math.abs(i - savedBin);
+        if (dist < 15) {
+          hue = 0 + 240 * savedFraction;
         }
         ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
         const x = marginLeft + i * barWidth;

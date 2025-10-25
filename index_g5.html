@@ -671,7 +671,7 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
 
 function generateSpectrumLine(clampedBin, plotWidth) {
   const numBars = 100;
-  const maxDb = 50 + Math.random() * 30; // Random between 50-80 dB
+  const maxDb = 80;
   const sigma = 3;
   const line = new Array(numBars).fill(0);
   for (let i = 0; i < numBars; i++) {
@@ -731,7 +731,7 @@ function animateSpectrum() {
   if (currentMode === 'fft') {
     const numBars = 100;
     const barWidth = plotWidth / numBars;
-    const maxDb = 50 + Math.random() * 30;
+    const maxDb = 80;
     const sigma = 3;
 
     for (let i = 0; i < numBars; i++) {
@@ -740,14 +740,11 @@ function animateSpectrum() {
       if (dist < 15) {
         db = maxDb * Math.exp(- (dist * dist) / (2 * sigma * sigma));
       }
-      const heightFraction = db / 100;
+      const heightFraction = db / maxDb;
       const height = heightFraction * plotHeight;
       const x = marginLeft + i * barWidth;
       const y = xAxisY - height;
-      let hue = 120 - db;
-      if (dist < 15) {
-        hue = 0 + 240 * fraction;
-      }
+      let hue = 120 - (db / maxDb * 60);
       ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
       ctx.fillRect(x, y, barWidth - 0.5, height);
     }
@@ -761,28 +758,37 @@ function animateSpectrum() {
     const newLine = generateSpectrumLine(clampedBin, plotWidth);
 
     // Add to buffer
-    waterfallLines.unshift({line: newLine, fraction: fraction, bin: clampedBin});
+    waterfallLines.unshift({line: newLine, bin: clampedBin});
     if (waterfallLines.length > maxLines) {
       waterfallLines.pop();
     }
 
     // Draw lines
-    for (let ly = 0; ly < waterfallLines.length; ly++) {
+    const numLines = waterfallLines.length;
+    for (let ly = 0; ly < numLines; ly++) {
       const entry = waterfallLines[ly];
       const line = entry.line;
-      const savedFraction = entry.fraction;
-      const savedBin = entry.bin;
+      const age = ly / Math.max(1, numLines - 1);
+      let traceHue;
+      if (age < 0.25) {
+        traceHue = 0 + 60 * (age / 0.25);
+      } else if (age < 0.5) {
+        traceHue = 60 + 60 * ((age - 0.25) / 0.25);
+      } else if (age < 0.75) {
+        traceHue = 120 + 120 * ((age - 0.5) / 0.25);
+      } else {
+        traceHue = 240;
+      }
+      const fade = 1 - age * 0.8;
       const y = ly * lineHeight;
       for (let i = 0; i < numBars; i++) {
         const db = line[i];
-        let hue = 120 - db;
-        const dist = Math.abs(i - savedBin);
-        if (dist < 15) {
-          hue = 0 + 240 * savedFraction;
+        if (db > 0) {
+          const alpha = (db / 80) * fade;
+          ctx.fillStyle = `hsla(${traceHue}, 70%, 50%, ${alpha})`;
+          const x = marginLeft + i * barWidth;
+          ctx.fillRect(x, y, barWidth - 0.5, lineHeight);
         }
-        ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
-        const x = marginLeft + i * barWidth;
-        ctx.fillRect(x, y, barWidth - 0.5, lineHeight);
       }
     }
   }

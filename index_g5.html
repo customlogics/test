@@ -726,7 +726,9 @@ function animateSpectrum() {
   const plotHeight = canvasHeight - marginBottom;
   const xAxisY = canvasHeight - marginBottom;
 
-  drawAxes(ctx, canvasWidth, canvasHeight);
+  if (currentMode === 'fft') {
+    drawAxes(ctx, canvasWidth, canvasHeight);
+  }
 
   if (currentMode === 'fft') {
     const numBars = 100;

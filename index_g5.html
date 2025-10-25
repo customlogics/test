@@ -669,6 +669,44 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
   ctx.fillText('Frequency (kHz)', canvasWidth / 2, canvasHeight - 5);
 }
 
+function drawXAxis(ctx, canvasWidth, canvasHeight) {
+  const marginLeft = 55;
+  const marginBottom = 45;
+  const plotWidth = canvasWidth - marginLeft;
+  const plotHeight = canvasHeight - marginBottom;
+
+  ctx.strokeStyle = '#9fb0c0'; // muted
+  ctx.lineWidth = 1;
+  ctx.font = 'bold 12px Inter, Arial'; // Use bold for crisper text
+  ctx.fillStyle = '#9fb0c0';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle'; // Better alignment
+
+  // X axis
+  const xAxisY = canvasHeight - marginBottom;
+  ctx.beginPath();
+  ctx.moveTo(marginLeft, xAxisY);
+  ctx.lineTo(canvasWidth, xAxisY);
+  ctx.stroke();
+
+  // X ticks and labels (15 to 70 kHz)
+  const xTicks = [15, 25, 35, 45, 55, 65, 70];
+  xTicks.forEach((freq, i) => {
+    const x = marginLeft + (i / (xTicks.length - 1)) * plotWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, xAxisY);
+    ctx.lineTo(x, xAxisY + 5);
+    ctx.stroke();
+    // Shift last label slightly left to avoid cutoff
+    const labelX = (i === xTicks.length - 1) ? x - 15 : x;
+    ctx.fillText(`${freq}`, labelX, xAxisY + 20);
+  });
+
+  // Overall labels
+  ctx.font = 'bold 12px Inter, Arial';
+  ctx.fillText('Frequency (kHz)', canvasWidth / 2, canvasHeight - 5);
+}
+
 function generateSpectrumLine(clampedBin, plotWidth) {
   const numBars = 100;
   const maxDb = 80;
@@ -793,6 +831,8 @@ function animateSpectrum() {
         }
       }
     }
+
+    drawXAxis(ctx, canvasWidth, canvasHeight);
   }
 
   requestAnimationFrame(animateSpectrum);

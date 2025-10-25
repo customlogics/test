@@ -215,6 +215,12 @@
             <label for="modeWaterfall">Waterfall</label>
           </div>
           <canvas id="spectrumCanvas" style="width:100%; height:160px; border-radius:8px; background:var(--card); display:block; margin-top:8px;"></canvas>
+          <div style="margin-top:8px; display:flex; justify-content:space-between; gap:4px; font-size:12px;">
+            <div><span class="small-muted">Min Freq:</span> <span id="spec_minfreq" style="color:var(--text); font-weight:600;">-- kHz</span></div>
+            <div><span class="small-muted">Max Freq:</span> <span id="spec_maxfreq" style="color:var(--text); font-weight:600;">-- kHz</span></div>
+            <div><span class="small-muted">Velocity:</span> <span id="spec_wave" style="color:var(--text); font-weight:600;">-- ppm</span></div>
+            <div><span class="small-muted">Pattern:</span> <span id="spec_pattern" style="color:var(--text); font-weight:600;">--</span></div>
+          </div>
         </div>
 
         <div class="tile" id="card_pattern" style="border-left:6px solid var(--accent-2)">
@@ -568,9 +574,24 @@ function parseLivePacket(bytes){
   };
 }
 function showLive(obj){
+  const spec_minfreq = document.getElementById("spec_minfreq");
+  const spec_maxfreq = document.getElementById("spec_maxfreq");
+  const spec_wave = document.getElementById("spec_wave");
+  const spec_pattern = document.getElementById("spec_pattern");
   if(!obj || obj.error){
     card_battery.textContent="-- V";
     card_current_val.textContent="-- mA";
+    card_temp_value.textContent = "-- °C";
+    card_minfreq.textContent = "-- kHz";
+    card_maxfreq.textContent = "-- kHz";
+    const waveStr = "-- ppm";
+    card_waveval.textContent = waveStr;
+    spec_wave.textContent = waveStr;
+    const patStr = "--";
+    card_pattern_val.textContent = patStr;
+    spec_pattern.textContent = patStr;
+    spec_minfreq.textContent = "-- kHz";
+    spec_maxfreq.textContent = "-- kHz";
     return;
   }
   card_battery.textContent = (obj.battery_mV != null) ? (obj.battery_mV/1000).toFixed(3) + " V" : "-- V";
@@ -578,10 +599,18 @@ function showLive(obj){
   card_temp_value.textContent = (obj.temp_raw != null) ? (obj.temp_raw/100).toFixed(2) + " °C" : "-- °C";
   const minHz = obj.min_Hz != null ? Math.max(15000, obj.min_Hz) : 15000;
   const maxHz = obj.max_Hz != null ? Math.min(70000, obj.max_Hz) : 70000;
-  card_minfreq.textContent = (minHz / 1000).toFixed(1) + " kHz";
-  card_maxfreq.textContent = (maxHz / 1000).toFixed(1) + " kHz";
-  card_waveval.textContent = (obj.waveVal != null) ? obj.waveVal.toString() : "--";
-  card_pattern_val.textContent = (obj.pattern != null) ? obj.pattern.toString() : "--";
+  const minStr = (minHz / 1000).toFixed(1) + " kHz";
+  const maxStr = (maxHz / 1000).toFixed(1) + " kHz";
+  card_minfreq.textContent = minStr;
+  card_maxfreq.textContent = maxStr;
+  spec_minfreq.textContent = minStr;
+  spec_maxfreq.textContent = maxStr;
+  const waveStr = (obj.waveVal != null) ? obj.waveVal.toString() + " ppm" : "-- ppm";
+  card_waveval.textContent = waveStr;
+  spec_wave.textContent = waveStr;
+  const patStr = (obj.pattern != null) ? obj.pattern.toString() : "--";
+  card_pattern_val.textContent = patStr;
+  spec_pattern.textContent = patStr;
   card_days.textContent = (obj.days != null) ? obj.days.toString() + " Days" : "-- Days";
   card_hhmmss.textContent = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "--:--:--";
 
@@ -651,8 +680,8 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
     ctx.fillText(`${freq}`, labelX, xAxisY + 20);
   });
 
-  // Y ticks and labels (0 to 100 dB)
-  const yTicks = [0, 20, 40, 60, 80, 100];
+  // Y ticks and labels (0 to 80 dB)
+  const yTicks = [0, 20, 40, 60, 80];
   yTicks.forEach((db, i) => {
     const y = xAxisY - (i / (yTicks.length - 1)) * plotHeight;
     ctx.beginPath();
@@ -807,20 +836,21 @@ function animateSpectrum() {
   if (currentMode === 'fft') {
     const numBars = 100;
     const barWidth = plotWidth / numBars;
-    const maxDb = 80;
+    const maxScale = 80;
     const sigma = 3;
 
     for (let i = 0; i < numBars; i++) {
       const dist = Math.abs(i - clampedBin);
+      let peakDb = 60 + Math.random() * 20;
       let db = 0;
       if (dist < 15) {
-        db = maxDb * Math.exp(- (dist * dist) / (2 * sigma * sigma));
+        db = peakDb * Math.exp(- (dist * dist) / (2 * sigma * sigma));
       }
-      const heightFraction = db / maxDb;
+      const heightFraction = db / maxScale;
       const height = heightFraction * plotHeight;
       const x = marginLeft + i * barWidth;
       const y = xAxisY - height;
-      let hue = 120 - (db / maxDb * 60);
+      let hue = 120 - (db / maxScale * 60);
       ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
       ctx.fillRect(x, y, barWidth - 0.5, height);
     }

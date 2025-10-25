@@ -418,7 +418,8 @@ function setupCanvas(canvas) {
   return ctx;
 }
 
-/* Draw axes (same style as before) */
+/* Draw axes (cosmetic): when currentMode === 'waterfall' do not draw y-axis dB values nor the x-axis frequency labels.
+   This preserves the axis baseline/left margin so waterfall aligns with other UI, but removes the numeric labels.*/
 function drawAxes(ctx, canvasWidth, canvasHeight) {
   const marginLeft = 55;
   const marginBottom = 45;
@@ -433,26 +434,43 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
   ctx.textBaseline = 'middle';
 
   const xAxisY = canvasHeight - marginBottom;
+  // draw baseline and left axis line regardless (keeps layout)
   ctx.beginPath(); ctx.moveTo(marginLeft, xAxisY); ctx.lineTo(canvasWidth, xAxisY); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(marginLeft, 0); ctx.lineTo(marginLeft, xAxisY); ctx.stroke();
 
-  const xTicks = [15,25,35,45,55,65,70];
-  xTicks.forEach((freq,i)=>{
-    const x = marginLeft + (i/(xTicks.length-1)) * plotWidth;
-    ctx.beginPath(); ctx.moveTo(x, xAxisY); ctx.lineTo(x, xAxisY+5); ctx.stroke();
-    const labelX = (i===xTicks.length-1) ? x-15 : x;
-    ctx.fillText(`${freq}`, labelX, xAxisY + 20);
-  });
+  // If in FFT mode, draw full ticks & labels; in Waterfall mode we hide numeric labels (cosmetic request)
+  if(currentMode !== 'waterfall'){
+    const xTicks = [15,25,35,45,55,65,70];
+    xTicks.forEach((freq,i)=>{
+      const x = marginLeft + (i/(xTicks.length-1)) * plotWidth;
+      ctx.beginPath(); ctx.moveTo(x, xAxisY); ctx.lineTo(x, xAxisY+5); ctx.stroke();
+      const labelX = (i===xTicks.length-1) ? x-15 : x;
+      ctx.fillText(`${freq}`, labelX, xAxisY + 20);
+    });
 
-  const yTicks=[0,20,40,60,80,100];
-  yTicks.forEach((db,i)=>{
-    const y = xAxisY - (i/(yTicks.length-1))*plotHeight;
-    ctx.beginPath(); ctx.moveTo(marginLeft-5,y); ctx.lineTo(marginLeft,y); ctx.stroke();
-    ctx.textAlign='right'; ctx.fillText(`${db} dB`, marginLeft-10, y+4); ctx.textAlign='center';
-  });
-
-  ctx.font = 'bold 12px Inter, Arial';
-  ctx.fillText('Frequency (kHz)', canvasWidth/2, canvasHeight-5);
+    const yTicks=[0,20,40,60,80,100];
+    yTicks.forEach((db,i)=>{
+      const y = xAxisY - (i/(yTicks.length-1))*plotHeight;
+      ctx.beginPath(); ctx.moveTo(marginLeft-5,y); ctx.lineTo(marginLeft,y); ctx.stroke();
+      ctx.textAlign='right'; ctx.fillText(`${db} dB`, marginLeft-10, y+4); ctx.textAlign='center';
+    });
+    ctx.font = 'bold 12px Inter, Arial';
+    ctx.fillText('Frequency (kHz)', canvasWidth/2, canvasHeight-5);
+  } else {
+    // Waterfall mode: draw only subtle ticks (no numeric labels) to indicate grid but keep it minimal
+    const xTickCount = 6;
+    for(let i=0;i<=xTickCount;i++){
+      const x = marginLeft + (i/xTickCount) * plotWidth;
+      ctx.beginPath(); ctx.moveTo(x, xAxisY); ctx.lineTo(x, xAxisY+3); ctx.stroke();
+    }
+    // Y minor ticks only (no labels)
+    const yTickCount = 5;
+    for(let i=0;i<=yTickCount;i++){
+      const y = xAxisY - (i/yTickCount)*plotHeight;
+      ctx.beginPath(); ctx.moveTo(marginLeft-4,y); ctx.lineTo(marginLeft,y); ctx.stroke();
+    }
+    // No axis labels in waterfall mode (x axis is now treated as time)
+  }
 }
 
 /* color interpolation helpers for the tail: red -> yellow -> green -> deep blue (#0000aa) */
@@ -840,3 +858,4 @@ window.addEventListener('resize', ()=>{
 </script>
 </body>
 </html>
+

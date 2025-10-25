@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -209,9 +209,9 @@
             Spectrum analysis
           </div>
           <div class="radio-group">
-            <input type="radio" id="modeFft" name="spectrumMode" checked>
+            <input type="radio" id="modeFft" name="spectrumMode">
             <label for="modeFft">FFT</label>
-            <input type="radio" id="modeWaterfall" name="spectrumMode">
+            <input type="radio" id="modeWaterfall" name="spectrumMode" checked>
             <label for="modeWaterfall">Waterfall</label>
           </div>
           <canvas id="spectrumCanvas" style="width:100%; height:160px; border-radius:8px; background:var(--card); display:block; margin-top:8px;"></canvas>
@@ -522,8 +522,9 @@ let currentMaxHz = 70000; // default 70kHz
 let currentWavePpm = 0;
 let animationStartTime = performance.now();
 let isAnimating = false;
-let currentMode = 'fft';
+let currentMode = 'waterfall';
 let waterfallLines = [];
+let highlightUntil = 0;
 
 /* helpers */
 function hexToBytes(hexStr){
@@ -590,6 +591,7 @@ function showLive(obj){
   if (obj.max_Hz != null) currentMaxHz = Math.min(70000, obj.max_Hz);
   if (obj.waveVal != null) {
     currentWavePpm = obj.waveVal;
+    highlightUntil = performance.now() + 500;
     if (!isAnimating && currentWavePpm > 0) {
       isAnimating = true;
       animationStartTime = performance.now();
@@ -610,29 +612,6 @@ function setupCanvas(canvas) {
   ctx.scale(dpr, dpr);
   ctx.imageSmoothingEnabled = false;
   return ctx;
-}
-
-function getColor(db) {
-  const normalized = Math.min(1, Math.max(0, db / 100));
-  let hue, sat, light;
-  if (normalized < 0.25) {
-    hue = 240; // dark blue
-    sat = 40;
-    light = 5 + normalized * 15; // 5% to 20%
-  } else if (normalized < 0.5) {
-    hue = 200; // cyan-ish
-    sat = 60;
-    light = 20 + (normalized - 0.25) * 20; // 20% to 40%
-  } else if (normalized < 0.75) {
-    hue = 120; // green
-    sat = 80;
-    light = 40 + (normalized - 0.5) * 20; // 40% to 60%
-  } else {
-    hue = 0; // red/orange burst
-    sat = 90;
-    light = 60 + (normalized - 0.75) * 40; // 60% to 100%
-  }
-  return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
 function drawAxes(ctx, canvasWidth, canvasHeight) {
@@ -738,10 +717,10 @@ function animateSpectrum() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const cardBg = getComputedStyle(document.documentElement).getPropertyValue('--card').trim();
-  const bgColor = (currentMode === 'waterfall') ? '#000033' : cardBg;
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (currentMode === 'waterfall') {
+    ctx.fillStyle = 'rgba(0,0,170,1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 
   const marginLeft = 55;
   const marginBottom = 45;
@@ -767,7 +746,11 @@ function animateSpectrum() {
       const height = heightFraction * plotHeight;
       const x = marginLeft + i * barWidth;
       const y = xAxisY - height;
-      ctx.fillStyle = getColor(db);
+      let hue = 120 - db;
+      if (i === clampedBin && now < highlightUntil) {
+        hue = 60;
+      }
+      ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
       ctx.fillRect(x, y, barWidth - 0.5, height);
     }
   } else { // waterfall
@@ -786,15 +769,16 @@ function animateSpectrum() {
     }
 
     // Draw lines
-    const numLines = waterfallLines.length;
-    for (let ly = 0; ly < numLines; ly++) {
+    for (let ly = 0; ly < waterfallLines.length; ly++) {
       const line = waterfallLines[ly];
       const y = ly * lineHeight;
-      const ageFactor = numLines > 1 ? 1 - (ly / (numLines - 1)) : 1;
       for (let i = 0; i < numBars; i++) {
         const db = line[i];
-        const effectiveDb = db * ageFactor;
-        ctx.fillStyle = getColor(effectiveDb);
+        let hue = 120 - db;
+        if (ly === 0 && i === clampedBin && now < highlightUntil) {
+          hue = 60;
+        }
+        ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
         const x = marginLeft + i * barWidth;
         ctx.fillRect(x, y, barWidth - 0.5, lineHeight);
       }
@@ -1168,4 +1152,124 @@ modalReset.addEventListener('click', ()=>{
   if(d.en_default) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
   if(editingFeature === 'beep'){ modalSlider.value = (d.def!=null)?d.def:(d.value!=null?d.value:modalSlider.min); updateModalSliderValueDisplaySeconds(); }
   else if(editingFeature === 'standby' || editingFeature === 'shutdown'){ modalSlider.value = (d.def_mV!=null)?d.def_mV:(d.value_mV!=null?d.value_mV:modalSlider.min); updateModalSliderValueDisplayVolts(); }
-  else if(editing
+  else if(editingFeature === 'hiss'){ modalSlider.value = (d.def_pct!=null)?d.def_pct:(d.value_pct!=null?d.value_pct:modalSlider.min); updateModalSliderValueDisplayPercent(); }
+});
+modalClose.addEventListener('click', closeModal);
+modalBackdrop.addEventListener('click', (ev)=>{ if(ev.target === modalBackdrop) closeModal(); });
+function closeModal(){ modalBackdrop.style.display = 'none'; editingFeature = null; }
+
+/* modal save uses performSaveWrite (which waits for ACK) */
+modalSave.addEventListener('click', async ()=>{
+  if(!editingFeature || !currentInitData){ closeModal(); return; }
+  if(!writeChar) { alert("Not connected — can't send save command"); return; }
+  if(writeInProgress) { alert("Write in progress — try again"); return; }
+
+  const enabledNow = modalToggle.classList.contains('on') ? 1 : 0;
+  const sliderRaw = parseInt(modalSlider.value,10);
+  modalSave.disabled = true; const prevText = modalSave.textContent; modalSave.textContent = "Saving...";
+  try{
+    await performSaveWrite(editingFeature, enabledNow, sliderRaw);
+    // On ACK success update local model & UI
+    if(editingFeature === 'beep'){ currentInitData.beep.enabled = enabledNow===1; currentInitData.beep.value = sliderRaw; }
+    else if(editingFeature === 'standby'){ currentInitData.standby.enabled = enabledNow===1; currentInitData.standby.value_mV = sliderRaw; }
+    else if(editingFeature === 'shutdown'){ currentInitData.shutdown.enabled = enabledNow===1; currentInitData.shutdown.value_mV = sliderRaw; }
+    else if(editingFeature === 'hiss'){ currentInitData.hiss.enabled = enabledNow===1; currentInitData.hiss.value_pct = sliderRaw; }
+    showInit(currentInitData);
+    closeModal();
+    alert("Save acknowledged (INIT byte10=1).");
+  }catch(e){
+    console.warn("Save ACK error:", e);
+    alert("No response received (timeout). Save not acknowledged.");
+  }finally{
+    modalSave.disabled = false; modalSave.textContent = prevText; pendingSave = null;
+  }
+});
+
+/* gear button wiring */
+document.querySelectorAll('.gear').forEach(g => {
+  g.addEventListener('click', async () => {
+    const feature = g.dataset.feature;
+    if (currentInitData) { openFeatureModal(feature); return; }
+    if (!writeChar) { alert("Not connected. Please connect before editing features."); return; }
+    try {
+      console.log("No INIT cached — sending INIT request before opening modal");
+      await sendInitCmd();
+      const initParsed = await waitForNextInit(3000); // 3s
+      console.log("Received INIT after request:", initParsed);
+      openFeatureModal(feature);
+    } catch (err) {
+      console.warn("Failed to get INIT before opening modal:", err);
+      alert("Could not get INIT from device. Try sending INIT manually or try again.");
+    }
+  });
+});
+
+/* UI wiring for other controls */
+connectButton.addEventListener('click', connect);
+disconnectButton.addEventListener('click', disconnect);
+sendLiveBtn.addEventListener('click', sendLiveCmd);
+sendInitBtn.addEventListener('click', sendInitCmd);
+startAutoBtn.addEventListener('click', startAutoLive);
+stopAutoBtn.addEventListener('click', stopAutoLive);
+clearRaw.addEventListener('click', ()=> recvRaw.innerHTML = '');
+forceParse.addEventListener('click', ()=>{
+  if(!lastPacket) return alert("No packet available");
+  if(!isTagAt(lastPacket, 6, "LIVE")) return alert("Latest packet does not have 'LIVE' at bytes 6..9 — parsing skipped.");
+  if(lastPacket.length < 28) return alert("LIVE packet too short (need ≥28 bytes).");
+  const parsed = parseLivePacket(lastPacket);
+  if(parsed.error) alert(parsed.error); else showLive(parsed);
+});
+document.getElementById('copyParsed').addEventListener('click', async ()=>{
+  const lines = [
+    `Battery (V): ${card_battery.textContent}`,
+    `Current (mA): ${card_current_val.textContent}`,
+    `Temp (°C): ${card_temp_value.textContent}`,
+    `Min(kHz): ${card_minfreq.textContent}`,
+    `Max(kHz): ${card_maxfreq.textContent}`
+  ].join("\n");
+  await navigator.clipboard.writeText(lines); alert("LIVE parsed copied");
+});
+document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
+
+/* Spectrum mode switching */
+modeFft.addEventListener('change', () => {
+  if (modeFft.checked) {
+    currentMode = 'fft';
+    if (currentWavePpm > 0 && !isAnimating) {
+      isAnimating = true;
+      animationStartTime = performance.now();
+      requestAnimationFrame(animateSpectrum);
+    }
+  }
+});
+modeWaterfall.addEventListener('change', () => {
+  if (modeWaterfall.checked) {
+    currentMode = 'waterfall';
+    waterfallLines = []; // Reset buffer
+    if (currentWavePpm > 0 && !isAnimating) {
+      isAnimating = true;
+      animationStartTime = performance.now();
+      requestAnimationFrame(animateSpectrum);
+    }
+  }
+});
+
+/* initial checks */
+if(!navigator.bluetooth){
+  alert("Web Bluetooth not available in this browser.");
+  connectButton.disabled = true;
+  startAutoBtn.disabled = true;
+  sendInitBtn.disabled = true;
+  stopAutoBtn.disabled = true;
+}
+
+/* Handle canvas resize */
+window.addEventListener('resize', () => {
+  if (isAnimating) {
+    animationStartTime = performance.now();
+    requestAnimationFrame(animateSpectrum);
+  }
+});
+</script>
+</body>
+</html>

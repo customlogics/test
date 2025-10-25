@@ -707,6 +707,42 @@ function drawXAxis(ctx, canvasWidth, canvasHeight) {
   ctx.fillText('Frequency (kHz)', canvasWidth / 2, canvasHeight - 5);
 }
 
+function drawTimeYAxis(ctx, canvasWidth, canvasHeight) {
+  const marginLeft = 55;
+  const marginBottom = 45;
+  const plotHeight = canvasHeight - marginBottom;
+  const xAxisY = canvasHeight - marginBottom;
+
+  ctx.strokeStyle = '#9fb0c0'; // muted
+  ctx.lineWidth = 1;
+  ctx.font = 'bold 12px Inter, Arial';
+  ctx.fillStyle = '#9fb0c0';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Y axis
+  ctx.beginPath();
+  ctx.moveTo(marginLeft, 0);
+  ctx.lineTo(marginLeft, plotHeight);
+  ctx.stroke();
+
+  // Time ticks and labels (approx 60fps, ~2s total)
+  const maxTimeS = 2;
+  const timeTicks = [0, 1, 2];
+  timeTicks.forEach((timeAgo, i) => {
+    const fraction = timeAgo / maxTimeS;
+    const y = fraction * plotHeight;
+    ctx.beginPath();
+    ctx.moveTo(marginLeft - 5, y);
+    ctx.lineTo(marginLeft, y);
+    ctx.stroke();
+    ctx.textAlign = 'right';
+    const label = i === 0 ? 'Now' : `${timeAgo} s ago`;
+    ctx.fillText(label, marginLeft - 10, y + 4);
+    ctx.textAlign = 'center';
+  });
+}
+
 function generateSpectrumLine(clampedBin, plotWidth) {
   const numBars = 100;
   const maxDb = 80;
@@ -832,6 +868,7 @@ function animateSpectrum() {
       }
     }
 
+    drawTimeYAxis(ctx, canvasWidth, canvasHeight);
     drawXAxis(ctx, canvasWidth, canvasHeight);
   }
 

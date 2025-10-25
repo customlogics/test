@@ -68,7 +68,7 @@
   .radio-group input[type="radio"] { accent-color: var(--accent-2); }
   .radio-group label { color: var(--muted); font-size: 12px; cursor: pointer; user-select: none; }
 
-  /* Canvas styling: remove default bgcolor and let script draw the bluish background */
+  /* Canvas styling: remove default bgcolor and let script draw the background */
   canvas#spectrumCanvas { width:100%; height:160px; border-radius:8px; display:block; margin-top:8px; background:transparent; }
 </style>
 </head>
@@ -423,7 +423,7 @@
 <script>
 /* ==========================
    BLE + parsing + UI JS
-   (behavior unchanged — only small spectrum/waterfall adjustments requested)
+   (behavior unchanged — only waterfall background + new-point color trace updated)
    ========================== */
 
 /* UUIDs & frames */
@@ -524,7 +524,7 @@ let currentMaxHz = 70000; // default 70kHz
 let currentWavePpm = 0;
 let animationStartTime = performance.now();
 let isAnimating = false;
-// 1) Make waterfall default
+// waterfall default
 let currentMode = 'waterfall';
 let waterfallLines = [];
 
@@ -618,14 +618,13 @@ function setupCanvas(canvas) {
   return ctx;
 }
 
-/* Draw axes and labels over bluish background */
+/* Draw axes and labels over background */
 function drawAxes(ctx, canvasWidth, canvasHeight) {
   const marginLeft = 55;
   const marginBottom = 45;
   const plotWidth = canvasWidth - marginLeft;
   const plotHeight = canvasHeight - marginBottom;
 
-  // axes color slightly cyan-tinted for contrast on dark bluish bg
   ctx.strokeStyle = 'rgba(160,200,220,0.24)';
   ctx.lineWidth = 1;
   ctx.font = 'bold 12px Inter, Arial';
@@ -635,19 +634,16 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
 
   const xAxisY = canvasHeight - marginBottom;
 
-  // X axis line
   ctx.beginPath();
   ctx.moveTo(marginLeft, xAxisY);
   ctx.lineTo(canvasWidth, xAxisY);
   ctx.stroke();
 
-  // Y axis line
   ctx.beginPath();
   ctx.moveTo(marginLeft, 0);
   ctx.lineTo(marginLeft, xAxisY);
   ctx.stroke();
 
-  // X ticks and labels (15 to 70 kHz)
   const xTicks = [15, 25, 35, 45, 55, 65, 70];
   xTicks.forEach((freq, i) => {
     const x = marginLeft + (i / (xTicks.length - 1)) * plotWidth;
@@ -659,7 +655,6 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
     ctx.fillText(`${freq}`, labelX, xAxisY + 20);
   });
 
-  // Y ticks and labels (0 to 100 dB)
   const yTicks = [0, 20, 40, 60, 80, 100];
   yTicks.forEach((db, i) => {
     const y = xAxisY - (i / (yTicks.length - 1)) * plotHeight;
@@ -672,12 +667,11 @@ function drawAxes(ctx, canvasWidth, canvasHeight) {
     ctx.textAlign = 'center';
   });
 
-  // overall x label
   ctx.font = 'bold 12px Inter, Arial';
   ctx.fillText('Frequency (kHz)', canvasWidth / 2, canvasHeight - 5);
 }
 
-/* Map dB/amplitude to a visually pleasing color (bright burst palette) */
+/* Map dB/amplitude to color (keeps original pleasant palette for bars) */
 function mapDbToColor(db) {
   const v = Math.max(0, Math.min(1, db / 100));
   const bright = Math.min(1, v * 1.4);
@@ -687,11 +681,11 @@ function mapDbToColor(db) {
   return `hsl(${h}, ${s}%, ${l}%)`;
 }
 
-/* use an exponential falloff spectrum generator for sharper sides */
+/* Exponential falloff generator */
 function generateSpectrumLine(clampedBin) {
   const numBars = 100;
-  const maxDb = 50 + Math.random() * 30; // Random main peak 50-80 dB
-  const decay = 0.55 + Math.random() * 0.6; // controls steepness (smaller -> steeper)
+  const maxDb = 50 + Math.random() * 30;
+  const decay = 0.55 + Math.random() * 0.6;
   const line = new Array(numBars).fill(0);
   for (let i = 0; i < numBars; i++) {
     const dist = Math.abs(i - clampedBin);
@@ -701,7 +695,7 @@ function generateSpectrumLine(clampedBin) {
   return line;
 }
 
-/* Main animation loop: draws FFT bars or waterfall, with requested tweaks */
+/* Main animation loop — background now matches card and new-point color trace is red->yellow->green->#0000aa */
 function animateSpectrum() {
   if (!isAnimating || currentWavePpm <= 0 || currentMinHz >= currentMaxHz) {
     isAnimating = false;
@@ -727,37 +721,18 @@ function animateSpectrum() {
 
   const currentFreq = currentMinHz + fraction * (currentMaxHz - currentMinHz);
 
-  // Map to bar index (100 bars). Use slight margin to prevent hard cut at edges.
   const minViz = 14000;
   const maxViz = 71000;
   const numBars = 100;
   const bin = Math.floor(((currentFreq - minViz) / (maxViz - minViz)) * (numBars - 1));
   const clampedBin = Math.max(0, Math.min(numBars - 1, bin));
 
-  // DRAW BACKGROUND
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (currentMode === 'waterfall') {
-    // 3) Use exact rgba = 0000aaff -> rgba(0,0,170,1)
-    ctx.fillStyle = 'rgba(0,0,170,1)';
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    // very subtle horizontal stripes for texture
-    ctx.save();
-    ctx.globalAlpha = 0.03;
-    for (let i = 0; i < 6; i++) {
-      const y = (i / 6) * canvasHeight;
-      ctx.fillRect(0, y, canvasWidth, 1);
-    }
-    ctx.restore();
-  } else {
-    // keep previous gradient for fft mode
-    const bgGrad = ctx.createLinearGradient(0, 0, 0, canvasHeight);
-    bgGrad.addColorStop(0, '#021f33');
-    bgGrad.addColorStop(1, '#06293f');
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-  }
+  // 1) Background same as card color (--card)
+  const cssCard = getComputedStyle(document.documentElement).getPropertyValue('--card') || '#14202a';
+  ctx.fillStyle = cssCard.trim() || '#14202a';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
   const marginLeft = 55;
   const marginBottom = 45;
@@ -766,7 +741,7 @@ function animateSpectrum() {
   const xAxisY = canvasHeight - marginBottom;
   const barWidth = plotWidth / numBars;
 
-  // Draw axes and labels
+  // Draw axes & labels on top of card bg
   drawAxes(ctx, canvasWidth, canvasHeight);
 
   if (currentMode === 'fft') {
@@ -784,14 +759,14 @@ function animateSpectrum() {
       ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), height);
     }
 
-    // Dimmer center spot (2) — reduced alpha and radius
+    // FFT burst (kept subtle)
     const centerX = marginLeft + clampedBin * barWidth + barWidth / 2;
     const centerY = xAxisY - (Math.min(1, (maxDb/100)) * plotHeight) * 0.6;
     const radial = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(6, barWidth * 6));
-    radial.addColorStop(0, 'rgba(255,255,220,0.45)');
-    radial.addColorStop(0.12, 'rgba(255,200,120,0.30)');
-    radial.addColorStop(0.28, 'rgba(140,220,255,0.18)');
-    radial.addColorStop(1, 'rgba(0,0,0,0)');
+    radial.addColorStop(0, 'rgba(255,50,50,0.28)');    // slightly red
+    radial.addColorStop(0.18, 'rgba(255,220,90,0.18)'); // yellowish
+    radial.addColorStop(0.38, 'rgba(40,200,80,0.12)');  // greenish
+    radial.addColorStop(1, 'rgba(0,0,170,0.08)');       // faint deep bluish rim
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = radial;
     ctx.beginPath();
@@ -804,7 +779,6 @@ function animateSpectrum() {
     const maxLines = Math.floor(plotHeight / lineHeight);
 
     const newLine = generateSpectrumLine(clampedBin);
-
     waterfallLines.unshift(newLine);
     if (waterfallLines.length > maxLines) waterfallLines.pop();
 
@@ -819,17 +793,18 @@ function animateSpectrum() {
         ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), lineHeight);
       }
 
-      // Dimmer burst on newest line: smaller radius and lower alpha
+      // 2) For the newest line (ly===0) draw the requested red->yellow->green->rgba(0,0,170,1) radial trace.
       if (ly === 0) {
         const centerX = marginLeft + clampedBin * barWidth + barWidth / 2;
         const centerY = y + (lineHeight / 2);
-        const burstR = Math.max(8, barWidth * 6); // smaller than before
+        const burstR = Math.max(10, barWidth * 12);
+
+        // Create radial gradient starting with RED -> YELLOW -> GREEN -> final deep bluish (rgba(0,0,170,1))
         const radial = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, burstR);
-        radial.addColorStop(0, 'rgba(255,255,240,0.45)');
-        radial.addColorStop(0.08, 'rgba(255,220,140,0.28)');
-        radial.addColorStop(0.24, 'rgba(130,230,255,0.18)');
-        radial.addColorStop(0.5, 'rgba(10,120,120,0.06)');
-        radial.addColorStop(1, 'rgba(0,0,0,0)');
+        radial.addColorStop(0.00, 'rgba(255,0,0,0.95)');      // red center (strong)
+        radial.addColorStop(0.18, 'rgba(255,210,0,0.85)');    // yellow
+        radial.addColorStop(0.40, 'rgba(0,200,80,0.65)');     // green
+        radial.addColorStop(1.00, 'rgba(0,0,170,1)');         // final requested deep bluish (opaque)
         ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = radial;
         ctx.beginPath();
@@ -1286,7 +1261,7 @@ document.getElementById('copyParsed').addEventListener('click', async ()=>{
 });
 document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
-/* Spectrum mode switching: keep handlers but ensure currentMode set by default to waterfall */
+/* Spectrum mode switching: keep handlers but ensure default remains waterfall */
 modeFft.addEventListener('change', () => {
   if (modeFft.checked) {
     currentMode = 'fft';

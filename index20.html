@@ -28,7 +28,7 @@
   .small-card{background:var(--card); padding:12px; border-radius:12px; border-left:6px solid var(--accent-2); color:inherit}
 
   .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
-  .tile{background:var(--card); border-radius:var(--card-radius); padding:18px; position:relative; overflow:hidden; box-shadow:0 6px 20px rgba(3,6,9,0.6);}
+  .tile{background:var(--card); border-radius:var(--card-radius); padding:18px; position:relative; overflow:hidden; box-shadow:0 6px 20px rgba(3,6,9,0.6);} 
   .tile .heading{font-size:16px;font-weight:800;margin-bottom:8px;color:var(--text);display:flex;align-items:center;gap:10px}
   .tile .sub{color:var(--muted);font-size:13px;margin-top:8px}
   .metric{display:flex;align-items:center;gap:12px}
@@ -69,11 +69,19 @@
 
   canvas#spectrumCanvas { width:100%; height:160px; border-radius:8px; display:block; margin-top:8px; background:transparent; }
 
-  /* New info row under the canvas */
+  /* Info row under the canvas */
   .spectrum-info { display:flex; gap:12px; margin-top:10px; align-items:center; flex-wrap:wrap; }
   .spectrum-info .info-chip { background:rgba(255,255,255,0.02); padding:8px 10px; border-radius:8px; font-weight:700; color:var(--text); font-size:13px; display:flex; gap:8px; align-items:center; min-width:120px; justify-content:space-between; border:1px solid rgba(255,255,255,0.03); }
   .spectrum-info .label { color:var(--muted); font-weight:600; font-size:12px; margin-right:8px; white-space:nowrap; }
   .spectrum-info .val { color:var(--accent-2); font-weight:800; }
+
+  /* INIT feature cards */
+  .init-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:8px}
+  .init-card{background:rgba(255,255,255,0.02);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.03);}
+  .init-card .title{font-weight:800;color:var(--text);margin-bottom:6px}
+  .init-row{display:flex;justify-content:space-between;align-items:center}
+  .init-val{font-weight:800;color:var(--accent-2)}
+  .init-sub{color:var(--muted);font-size:12px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -252,8 +260,50 @@
           <div class="sub" id="card_hhmmss">--:--:-- (HH:MM:SS)</div>
         </div>
 
-        <!-- INIT feature cards omitted for brevity (unchanged) -->
-        <!-- ... same as earlier code for init features ... -->
+        <!-- INIT feature cards (restored) -->
+        <div class="tile" style="border-left:6px solid #7c4dff; grid-column:1/-1;">
+          <div class="heading">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden>
+              <path d="M4 6h16v12H4z"></path>
+            </svg>
+            Configuration
+          </div>
+
+          <div class="init-grid">
+            <div class="init-card">
+              <div class="title">Audible Beep <button class="gear" data-feature="beep" style="float:right">Edit</button></div>
+              <div class="init-row"><div class="small-muted">Enabled</div><div class="init-val" id="beep_enabled_card">--</div></div>
+              <div class="init-row" style="margin-top:8px"><div class="small-muted">Set</div><div class="init-val" id="beep_set">--</div></div>
+              <div class="init-row" style="margin-top:8px"><div class="small-muted">Default</div><div class="init-val" id="beep_default_card">--</div></div>
+              <div class="init-sub" id="beep_minmax">-- / -- s</div>
+            </div>
+
+            <div class="init-card">
+              <div class="title">Standby Mode <button class="gear" data-feature="standby" style="float:right">Edit</button></div>
+              <div class="init-row"><div class="small-muted">Enabled</div><div class="init-val" id="standby_enabled_card">--</div></div>
+              <div class="init-row" style="margin-top:8px"><div class="small-muted">Set</div><div class="init-val" id="standby_set">--</div></div>
+              <div class="init-row" style="margin-top:8px"><div class="small-muted">Default</div><div class="init-val" id="standby_default_card">--</div></div>
+              <div class="init-sub" id="standby_minmax">-- / -- V</div>
+            </div>
+
+            <div class="init-card">
+              <div class="title">Shutdown Mode <button class="gear" data-feature="shutdown" style="float:right">Edit</button></div>
+              <div class="init-row"><div class="small-muted">Enabled</div><div class="init-val" id="shutdown_enabled_card">--</div></div>
+              <div class="init-row" style="margin-top:8px"><div class="small-muted">Set</div><div class="init-val" id="shutdown_set">--</div></div>
+              <div class="init-row" style="margin-top:8px"><div class="small-muted">Default</div><div class="init-val" id="shutdown_default_card">--</div></div>
+              <div class="init-sub" id="shutdown_minmax">-- / -- V</div>
+            </div>
+
+            <div class="init-card">
+              <div class="title">Audible Hiss Band <button class="gear" data-feature="hiss" style="float:right">Edit</button></div>
+              <div class="init-row"><div class="small-muted">Enabled</div><div class="init-val" id="hiss_enabled_card">--</div></div>
+              <div class="init-row" style="margin-top:8px"><div class="small-muted">Set</div><div class="init-val" id="hiss_set">--</div></div>
+              <div class="init-row" style="margin-top:8px"><div class="small-muted">Default</div><div class="init-val" id="hiss_default_card">--</div></div>
+              <div class="init-sub" id="hiss_minmax">-- / -- %</div>
+            </div>
+          </div>
+
+        </div>
 
       </div>
 
@@ -285,7 +335,7 @@
       <div style="height:1px;background:#dfe9f1;margin:8px 0"></div>
 
       <div style="text-align:center">
-        <div class="muted" id="sliderLabel">Duration</div>
+        <div class="muted" id="sliderLabel">Value</div>
         <input type="range" id="modalSlider" min="0" max="100" step="1" style="width:100%;margin-top:12px" />
         <div id="modalSliderValue" style="font-weight:800;margin-top:10px">0</div>
         <div style="display:flex;justify-content:space-between;margin-top:6px">
@@ -304,8 +354,10 @@
   </div>
 
 <script>
-/* Full BLE + UI code preserved. Only added the info row below the canvas and updated showLive()
-   to mirror values into those new elements. No functional logic was changed. */
+/* Full BLE + UI code preserved. I restored the INIT feature cards and implemented the modal handlers
+   so Edit buttons work exactly like your previous implementation: open modal, populate values from currentInitData,
+   allow editing toggle+slider, save writes using performSaveWrite and waits for ACK via waitForInitAck.
+   All BLE parsing, animation and other logic left unchanged. */
 
 /* UUIDs & frames */
 const serviceUuid = "0000fff0-0000-1000-8000-00805f9b34fb";
@@ -347,6 +399,27 @@ const spectrum_minfreq = document.getElementById("spectrum_minfreq");
 const spectrum_maxfreq = document.getElementById("spectrum_maxfreq");
 const spectrum_waveppm = document.getElementById("spectrum_waveppm");
 const spectrum_pattern = document.getElementById("spectrum_pattern");
+
+/* INIT display elements */
+const beep_enabled_card = document.getElementById('beep_enabled_card');
+const beep_set = document.getElementById('beep_set');
+const beep_default_card = document.getElementById('beep_default_card');
+const beep_minmax = document.getElementById('beep_minmax');
+
+const standby_enabled_card = document.getElementById('standby_enabled_card');
+const standby_set = document.getElementById('standby_set');
+const standby_default_card = document.getElementById('standby_default_card');
+const standby_minmax = document.getElementById('standby_minmax');
+
+const shutdown_enabled_card = document.getElementById('shutdown_enabled_card');
+const shutdown_set = document.getElementById('shutdown_set');
+const shutdown_default_card = document.getElementById('shutdown_default_card');
+const shutdown_minmax = document.getElementById('shutdown_minmax');
+
+const hiss_enabled_card = document.getElementById('hiss_enabled_card');
+const hiss_set = document.getElementById('hiss_set');
+const hiss_default_card = document.getElementById('hiss_default_card');
+const hiss_minmax = document.getElementById('hiss_minmax');
 
 /* state */
 let device, server, notifyChar, writeChar;
@@ -397,269 +470,6 @@ function parseLivePacket(bytes){
     rawHex: bytesToHexUpper(buf)
   };
 }
-function showLive(obj){
-  if(!obj || obj.error){ card_battery.textContent="-- V"; card_current_val.textContent="-- mA"; 
-    // also clear spectrum info
-    spectrum_minfreq.textContent = "-- kHz";
-    spectrum_maxfreq.textContent = "-- kHz";
-    spectrum_waveppm.textContent = "-- ppm";
-    spectrum_pattern.textContent = "--";
-    return;
-  }
-  card_battery.textContent = (obj.battery_mV != null) ? (obj.battery_mV/1000).toFixed(3) + " V" : "-- V";
-  card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(3) + " mA" : "-- mA";
-  card_temp_value.textContent = (obj.temp_raw != null) ? (obj.temp_raw/100).toFixed(2) + " °C" : "-- °C";
-  const minHz = obj.min_Hz != null ? Math.max(15000, obj.min_Hz) : 15000;
-  const maxHz = obj.max_Hz != null ? Math.min(70000, obj.max_Hz) : 70000;
-  card_minfreq.textContent = (minHz / 1000).toFixed(1) + " kHz";
-  card_maxfreq.textContent = (maxHz / 1000).toFixed(1) + " kHz";
-  card_waveval.textContent = (obj.waveVal != null) ? obj.waveVal.toString() : "--";
-  card_pattern_val.textContent = (obj.pattern != null) ? obj.pattern.toString() : "--";
-  card_days.textContent = (obj.days != null) ? obj.days.toString() + " Days" : "-- Days";
-  card_hhmmss.textContent = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "--:--:--";
-
-  // Update spectrum info row (new)
-  spectrum_minfreq.textContent = (minHz / 1000).toFixed(1) + " kHz";
-  spectrum_maxfreq.textContent = (maxHz / 1000).toFixed(1) + " kHz";
-  spectrum_waveppm.textContent = (obj.waveVal != null) ? `${obj.waveVal} ppm` : "-- ppm";
-  spectrum_pattern.textContent = (obj.pattern != null) ? `${obj.pattern}` : "--";
-
-  if (obj.min_Hz != null) currentMinHz = Math.max(15000, obj.min_Hz);
-  if (obj.max_Hz != null) currentMaxHz = Math.min(70000, obj.max_Hz);
-  if (obj.waveVal != null) {
-    currentWavePpm = obj.waveVal;
-    if (!isAnimating && currentWavePpm > 0) {
-      isAnimating = true;
-      animationStartTime = performance.now();
-      requestAnimationFrame(animateSpectrum);
-    }
-  }
-}
-
-/* Canvas helpers (high-DPI) */
-function setupCanvas(canvas) {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.scale(dpr, dpr);
-  ctx.imageSmoothingEnabled = true;
-  return ctx;
-}
-
-/* Draw axes (cosmetic): show x-axis labels always; hide y-axis numeric labels only in waterfall mode. */
-function drawAxes(ctx, canvasWidth, canvasHeight) {
-  const marginLeft = 55;
-  const marginBottom = 45;
-  const plotWidth = canvasWidth - marginLeft;
-  const plotHeight = canvasHeight - marginBottom;
-
-  ctx.strokeStyle = 'rgba(160,200,220,0.22)';
-  ctx.lineWidth = 1;
-  ctx.font = 'bold 12px Inter, Arial';
-  ctx.fillStyle = 'rgba(180,220,235,0.92)';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  const xAxisY = canvasHeight - marginBottom;
-  // draw baseline and left axis line regardless (keeps layout)
-  ctx.beginPath(); ctx.moveTo(marginLeft, xAxisY); ctx.lineTo(canvasWidth, xAxisY); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(marginLeft, 0); ctx.lineTo(marginLeft, xAxisY); ctx.stroke();
-
-  // Always draw full x-axis ticks & labels (frequency)
-  const xTicks = [15,25,35,45,55,65,70];
-  xTicks.forEach((freq,i)=>{
-    const x = marginLeft + (i/(xTicks.length-1)) * plotWidth;
-    ctx.beginPath(); ctx.moveTo(x, xAxisY); ctx.lineTo(x, xAxisY+5); ctx.stroke();
-    const labelX = (i===xTicks.length-1) ? x-15 : x;
-    ctx.fillText(`${freq}`, labelX, xAxisY + 20);
-  });
-  ctx.font = 'bold 12px Inter, Arial';
-  ctx.fillText('Frequency (kHz)', canvasWidth/2, canvasHeight-5);
-
-  // Y ticks: draw tick marks but show numeric labels only in FFT mode
-  const yTicks=[0,20,40,60,80,100];
-  yTicks.forEach((db,i)=>{
-    const y = xAxisY - (i/(yTicks.length-1))*plotHeight;
-    ctx.beginPath(); ctx.moveTo(marginLeft-5,y); ctx.lineTo(marginLeft,y); ctx.stroke();
-    if(currentMode !== 'waterfall'){
-      ctx.textAlign='right'; ctx.fillText(`${db} dB`, marginLeft-10, y+4); ctx.textAlign='center';
-    }
-  });
-}
-
-/* color interpolation helpers for the tail: red -> yellow -> green -> deep blue (#0000aa) */
-function lerp(a,b,t){ return a + (b-a)*t; }
-function hexToRgb(hex){
-  const h = hex.replace('#','');
-  const bigint = parseInt(h,16);
-  return [(bigint>>16)&255, (bigint>>8)&255, bigint&255];
-}
-function rgbToCss(r,g,b,a=1){ return `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`; }
-function lerpColorStops(t){
-  // stops: 0 -> red (#FF0000), 0.33 -> yellow (#FFD200), 0.66 -> green (#00C850), 1 -> deep bluish (#0000AA)
-  const stops = [
-    {pos:0, rgb:[255,0,0]},
-    {pos:0.33, rgb:[255,210,0]},
-    {pos:0.66, rgb:[0,200,80]},
-    {pos:1, rgb:[0,0,170]}
-  ];
-  if(t<=0) return stops[0].rgb;
-  if(t>=1) return stops[stops.length-1].rgb;
-  for(let i=0;i<stops.length-1;i++){
-    const a = stops[i], b = stops[i+1];
-    if(t >= a.pos && t <= b.pos){
-      const localT = (t - a.pos) / (b.pos - a.pos);
-      return [ lerp(a.rgb[0], b.rgb[0], localT), lerp(a.rgb[1], b.rgb[1], localT), lerp(a.rgb[2], b.rgb[2], localT) ];
-    }
-  }
-  return stops[stops.length-1].rgb;
-}
-
-/* Spectrum generator (same idea as before) */
-function generateSpectrumLine(clampedBin){
-  const numBars = 100;
-  const maxDb = 50 + Math.random() * 30;
-  const decay = 0.55 + Math.random() * 0.6;
-  const line = new Array(numBars).fill(0);
-  for(let i=0;i<numBars;i++){
-    const dist = Math.abs(i - clampedBin);
-    const val = maxDb * Math.exp(- decay * dist);
-    line[i] = (val < 0.35) ? 0 : val;
-  }
-  return line;
-}
-
-/* Main animation: waterfall with colored tail per-line (no giant radial spot) */
-function animateSpectrum(){
-  if(!isAnimating || currentWavePpm <= 0 || currentMinHz >= currentMaxHz){ isAnimating = false; return; }
-
-  const canvas = document.getElementById('spectrumCanvas');
-  const ctx = setupCanvas(canvas);
-  const dpr = window.devicePixelRatio || 1;
-  const canvasWidth = canvas.width / dpr;
-  const canvasHeight = canvas.height / dpr;
-
-  const now = performance.now();
-  const elapsedSeconds = (now - animationStartTime) / 1000;
-  const cyclesPerSecond = currentWavePpm / 60;
-  const cycleProgress = (elapsedSeconds * cyclesPerSecond) % 1;
-  let fraction = (cycleProgress < 0.5) ? (2 * cycleProgress) : (2 * (1 - cycleProgress));
-
-  const currentFreq = currentMinHz + fraction * (currentMaxHz - currentMinHz);
-
-  // map to bar
-  const minViz = 14000, maxViz = 71000, numBars = 100;
-  const bin = Math.floor(((currentFreq - minViz) / (maxViz - minViz)) * (numBars - 1));
-  const clampedBin = Math.max(0, Math.min(numBars - 1, bin));
-
-  // clear & paint background same as card
-  const cssCard = getComputedStyle(document.documentElement).getPropertyValue('--card') || '#14202a';
-  ctx.fillStyle = cssCard.trim() || '#14202a';
-  ctx.fillRect(0,0,canvasWidth,canvasHeight);
-
-  const marginLeft = 55;
-  const marginBottom = 45;
-  const plotWidth = canvasWidth - marginLeft;
-  const plotHeight = canvasHeight - marginBottom;
-  const xAxisY = canvasHeight - marginBottom;
-  const barWidth = plotWidth / numBars;
-
-  // draw axes on top of background
-  drawAxes(ctx, canvasWidth, canvasHeight);
-
-  if(currentMode === 'fft'){
-    // draw bars (keeps earlier feel)
-    const maxDb = 50 + Math.random()*30;
-    const decay = 0.5 + Math.random()*0.8;
-    for(let i=0;i<numBars;i++){
-      const dist = Math.abs(i - clampedBin);
-      let db = 0;
-      if(dist < 30) db = maxDb * Math.exp(- decay * dist);
-      const hf = Math.min(1, db/100);
-      const height = hf * plotHeight;
-      const x = marginLeft + i * barWidth;
-      const y = xAxisY - height;
-      // color mapping, similar to previous palette
-      const hue = 180 - db; // quick mapping
-      ctx.fillStyle = `hsl(${hue}, 70%, ${50 - db*0.1}%)`;
-      ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), height);
-    }
-    // small dim spot for FFT mode (kept subtle)
-    const centerX = marginLeft + clampedBin * barWidth + barWidth/2;
-    const centerY = xAxisY - plotHeight * 0.35;
-    const smallR = Math.max(8, barWidth*4);
-    const radial = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, smallR);
-    radial.addColorStop(0, 'rgba(255,100,80,0.22)');
-    radial.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = radial;
-    ctx.beginPath(); ctx.arc(centerX, centerY, smallR, 0, Math.PI*2); ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
-  } else {
-    // WATERFALL mode
-    const lineHeight = 1;
-    const maxLines = Math.floor(plotHeight / lineHeight);
-
-    // generate new spectrum line (top of waterfall)
-    const newLine = generateSpectrumLine(clampedBin);
-    waterfallLines.unshift(newLine);
-    if(waterfallLines.length > maxLines) waterfallLines.pop();
-
-    // tail length controls how many lines get the colored trace
-    const tailLen = Math.min(60, maxLines); // up to 60 lines colored
-    for(let ly=0; ly<waterfallLines.length; ly++){
-      const line = waterfallLines[ly];
-      const y = ly * lineHeight;
-
-      // draw basic amplitude bars (blue-ish mapping)
-      for(let i=0;i<numBars;i++){
-        const db = line[i];
-        if(!db) continue;
-        const x = marginLeft + i*barWidth;
-        // subtle bluish palette for waterfall amplitudes (keeps visibility)
-        const lightness = 20 + Math.min(50, db*0.35);
-        ctx.fillStyle = `hsl(200, 70%, ${lightness}%)`;
-        ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), lineHeight);
-      }
-
-      // colored tail overlay: only for positions near the active bin and only for first tailLen lines
-      if(ly < tailLen){
-        // age fraction 0 (newest) -> 1 (oldest in tail)
-        const ageT = ly / Math.max(1, tailLen - 1);
-        // compute RGB for this age from red->yellow->green->deepBlue
-        const rgb = lerpColorStops(ageT);
-        // alpha falls off with age (newest more opaque)
-        const alphaBase = 0.95 * (1 - ageT); // newest ~0.95, tail end small
-        // gaussian spread horizontally in bar units
-        const sigmaBars = 3; // controls tail width in bars (small, sharp)
-        const twoSigmaSq = 2 * sigmaBars * sigmaBars;
-
-        for(let i = Math.max(0, clampedBin - 8); i <= Math.min(numBars-1, clampedBin + 8); i++){
-          // compute intensity based on distance to clampedBin and also scale by amplitude in that bar
-          const dist = i - clampedBin;
-          const spread = Math.exp(- (dist*dist) / twoSigmaSq); // gaussian
-          const intensity = spread * alphaBase;
-          if(intensity < 0.005) continue;
-          const x = marginLeft + i * barWidth;
-          // overlay with composite lighter to blend with underlying amplitude
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.fillStyle = rgbToCss(rgb[0], rgb[1], rgb[2], Math.min(1, intensity));
-          ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), lineHeight);
-          ctx.globalCompositeOperation = 'source-over';
-        }
-      }
-    }
-  }
-
-  requestAnimationFrame(animateSpectrum);
-}
-
-/* INIT parsing & UI unchanged (omitted here for brevity in comments) */
 function parseInitPacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 51) return { error:"INIT too short" };
@@ -699,39 +509,260 @@ function parseInitPacket(bytes){
     rawHex: bytesToHexUpper(buf), _rawBuf: buf
   };
 }
+
 function showInit(obj){
   if(!obj || obj.error){ currentInitData = null; return; }
   currentInitData = obj;
-  // update cards...
-  // (same as prior implementation)
-  document.getElementById("beep_enabled_card").textContent = obj.beep.enabled ? "Enabled" : "Disabled";
-  document.getElementById("beep_set").textContent = (obj.beep.value!=null) ? `${obj.beep.value} s` : "-- s";
-  document.getElementById("beep_default_card").textContent = (obj.beep.def!=null) ? `${obj.beep.def} s` : "-- s";
-  document.getElementById("beep_minmax").textContent = `${obj.beep.min ?? "--"} / ${obj.beep.max ?? "--"} s`;
+  // update cards
+  beep_enabled_card.textContent = obj.beep.enabled ? "Enabled" : "Disabled";
+  beep_set.textContent = (obj.beep.value!=null) ? `${obj.beep.value} s` : "-- s";
+  beep_default_card.textContent = (obj.beep.def!=null) ? `${obj.beep.def} s` : "-- s";
+  beep_minmax.textContent = `${obj.beep.min ?? "--"} / ${obj.beep.max ?? "--"} s`;
 
-  document.getElementById("standby_enabled_card").textContent = obj.standby.enabled ? "Enabled" : "Disabled";
-  document.getElementById("standby_set").textContent = (obj.standby.value_mV!=null) ? `${(obj.standby.value_mV/1000).toFixed(3)} V` : "-- V";
-  document.getElementById("standby_default_card").textContent = (obj.standby.def_mV!=null) ? `${(obj.standby.def_mV/1000).toFixed(3)} V` : "-- V";
-  document.getElementById("standby_minmax").textContent = `${(obj.standby.min_mV!=null ? (obj.standby.min_mV/1000).toFixed(3):"--")} / ${(obj.standby.max_mV!=null ? (obj.standby.max_mV/1000).toFixed(3):"--")} V`;
+  standby_enabled_card.textContent = obj.standby.enabled ? "Enabled" : "Disabled";
+  standby_set.textContent = (obj.standby.value_mV!=null) ? `${(obj.standby.value_mV/1000).toFixed(3)} V` : "-- V";
+  standby_default_card.textContent = (obj.standby.def_mV!=null) ? `${(obj.standby.def_mV/1000).toFixed(3)} V` : "-- V";
+  standby_minmax.textContent = `${(obj.standby.min_mV!=null ? (obj.standby.min_mV/1000).toFixed(3):"--")} / ${(obj.standby.max_mV!=null ? (obj.standby.max_mV/1000).toFixed(3):"--")} V`;
 
-  document.getElementById("shutdown_enabled_card").textContent = obj.shutdown.enabled ? "Enabled" : "Disabled";
-  document.getElementById("shutdown_set").textContent = (obj.shutdown.value_mV!=null) ? `${(obj.shutdown.value_mV/1000).toFixed(3)} V` : "-- V";
-  document.getElementById("shutdown_default_card").textContent = (obj.shutdown.def_mV!=null) ? `${(obj.shutdown.def_mV/1000).toFixed(3)} V` : "-- V";
-  document.getElementById("shutdown_minmax").textContent = `${(obj.shutdown.min_mV!=null ? (obj.shutdown.min_mV/1000).toFixed(3):"--")} / ${(obj.shutdown.max_mV!=null ? (obj.shutdown.max_mV/1000).toFixed(3):"--")} V`;
+  shutdown_enabled_card.textContent = obj.shutdown.enabled ? "Enabled" : "Disabled";
+  shutdown_set.textContent = (obj.shutdown.value_mV!=null) ? `${(obj.shutdown.value_mV/1000).toFixed(3)} V` : "-- V";
+  shutdown_default_card.textContent = (obj.shutdown.def_mV!=null) ? `${(obj.shutdown.def_mV/1000).toFixed(3)} V` : "-- V";
+  shutdown_minmax.textContent = `${(obj.shutdown.min_mV!=null ? (obj.shutdown.min_mV/1000).toFixed(3):"--")} / ${(obj.shutdown.max_mV!=null ? (obj.shutdown.max_mV/1000).toFixed(3):"--")} V`;
 
-  document.getElementById("hiss_enabled_card").textContent = obj.hiss.enabled ? "Enabled" : "Disabled";
-  document.getElementById("hiss_set").textContent = (obj.hiss.value_pct!=null) ? `${obj.hiss.value_pct} %` : "-- %";
-  document.getElementById("hiss_default_card").textContent = (obj.hiss.def_pct!=null) ? `${obj.hiss.def_pct} %` : "-- %";
-  document.getElementById("hiss_minmax").textContent = `${obj.hiss.min_pct ?? "--"} / ${obj.hiss.max_pct ?? "--"} %`;
+  hiss_enabled_card.textContent = obj.hiss.enabled ? "Enabled" : "Disabled";
+  hiss_set.textContent = (obj.hiss.value_pct!=null) ? `${obj.hiss.value_pct} %` : "-- %";
+  hiss_default_card.textContent = (obj.hiss.def_pct!=null) ? `${obj.hiss.def_pct} %` : "-- %";
+  hiss_minmax.textContent = `${obj.hiss.min_pct ?? "--"} / ${obj.hiss.max_pct ?? "--"} %`;
 
   console.log("INIT parsed & UI updated");
 }
 
-/* write helpers, connect/disconnect, notify handler, save/ACK, modal wiring etc. 
-   All logic retained exactly as before from your working code (omitted here to keep file slightly shorter),
-   but in your real file these functions remain unchanged. For completeness they are included unchanged below. */
+function showLive(obj){
+  if(!obj || obj.error){ card_battery.textContent="-- V"; card_current_val.textContent="-- mA"; 
+    spectrum_minfreq.textContent = "-- kHz";
+    spectrum_maxfreq.textContent = "-- kHz";
+    spectrum_waveppm.textContent = "-- ppm";
+    spectrum_pattern.textContent = "--";
+    return;
+  }
+  card_battery.textContent = (obj.battery_mV != null) ? (obj.battery_mV/1000).toFixed(3) + " V" : "-- V";
+  card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(3) + " mA" : "-- mA";
+  card_temp_value.textContent = (obj.temp_raw != null) ? (obj.temp_raw/100).toFixed(2) + " °C" : "-- °C";
+  const minHz = obj.min_Hz != null ? Math.max(15000, obj.min_Hz) : 15000;
+  const maxHz = obj.max_Hz != null ? Math.min(70000, obj.max_Hz) : 70000;
+  card_minfreq.textContent = (minHz / 1000).toFixed(1) + " kHz";
+  card_maxfreq.textContent = (maxHz / 1000).toFixed(1) + " kHz";
+  card_waveval.textContent = (obj.waveVal != null) ? obj.waveVal.toString() : "--";
+  card_pattern_val.textContent = (obj.pattern != null) ? obj.pattern.toString() : "--";
+  card_days.textContent = (obj.days != null) ? obj.days.toString() + " Days" : "-- Days";
+  card_hhmmss.textContent = (obj.hh !== undefined) ? `${String(obj.hh).padStart(2,"0")}:${String(obj.mm||0).padStart(2,"0")}:${String(obj.ss||0).padStart(2,"0")}` : "--:--:--";
 
-/* --- WRITE/CONNECT/NOTIFY & UI wiring (copied/kept) --- */
+  // Update spectrum info row (new)
+  spectrum_minfreq.textContent = (minHz / 1000).toFixed(1) + " kHz";
+  spectrum_maxfreq.textContent = (maxHz / 1000).toFixed(1) + " kHz";
+  spectrum_waveppm.textContent = (obj.waveVal != null) ? `${obj.waveVal} ppm` : "-- ppm";
+  spectrum_pattern.textContent = (obj.pattern != null) ? `${obj.pattern}` : "--";
+
+  if (obj.min_Hz != null) currentMinHz = Math.max(15000, obj.min_Hz);
+  if (obj.max_Hz != null) currentMaxHz = Math.min(70000, obj.max_Hz);
+  if (obj.waveVal != null) {
+    currentWavePpm = obj.waveVal;
+    if (!isAnimating && currentWavePpm > 0) {
+      isAnimating = true;
+      animationStartTime = performance.now();
+      requestAnimationFrame(animateSpectrum);
+    }
+  }
+}
+
+/* Canvas helpers & drawing code (same as previous version) */
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(dpr, dpr);
+  ctx.imageSmoothingEnabled = true;
+  return ctx;
+}
+
+function drawAxes(ctx, canvasWidth, canvasHeight) {
+  const marginLeft = 55;
+  const marginBottom = 45;
+  const plotWidth = canvasWidth - marginLeft;
+  const plotHeight = canvasHeight - marginBottom;
+
+  ctx.strokeStyle = 'rgba(160,200,220,0.22)';
+  ctx.lineWidth = 1;
+  ctx.font = 'bold 12px Inter, Arial';
+  ctx.fillStyle = 'rgba(180,220,235,0.92)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const xAxisY = canvasHeight - marginBottom;
+  ctx.beginPath(); ctx.moveTo(marginLeft, xAxisY); ctx.lineTo(canvasWidth, xAxisY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(marginLeft, 0); ctx.lineTo(marginLeft, xAxisY); ctx.stroke();
+
+  const xTicks = [15,25,35,45,55,65,70];
+  xTicks.forEach((freq,i)=>{
+    const x = marginLeft + (i/(xTicks.length-1)) * plotWidth;
+    ctx.beginPath(); ctx.moveTo(x, xAxisY); ctx.lineTo(x, xAxisY+5); ctx.stroke();
+    const labelX = (i===xTicks.length-1) ? x-15 : x;
+    ctx.fillText(`${freq}`, labelX, xAxisY + 20);
+  });
+  ctx.font = 'bold 12px Inter, Arial';
+  ctx.fillText('Frequency (kHz)', canvasWidth/2, canvasHeight-5);
+
+  const yTicks=[0,20,40,60,80,100];
+  yTicks.forEach((db,i)=>{
+    const y = xAxisY - (i/(yTicks.length-1))*plotHeight;
+    ctx.beginPath(); ctx.moveTo(marginLeft-5,y); ctx.lineTo(marginLeft,y); ctx.stroke();
+    if(currentMode !== 'waterfall'){
+      ctx.textAlign='right'; ctx.fillText(`${db} dB`, marginLeft-10, y+4); ctx.textAlign='center';
+    }
+  });
+}
+
+function lerp(a,b,t){ return a + (b-a)*t; }
+function rgbToCss(r,g,b,a=1){ return `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`; }
+function lerpColorStops(t){
+  const stops = [
+    {pos:0, rgb:[255,0,0]},
+    {pos:0.33, rgb:[255,210,0]},
+    {pos:0.66, rgb:[0,200,80]},
+    {pos:1, rgb:[0,0,170]}
+  ];
+  if(t<=0) return stops[0].rgb;
+  if(t>=1) return stops[stops.length-1].rgb;
+  for(let i=0;i<stops.length-1;i++){
+    const a = stops[i], b = stops[i+1];
+    if(t >= a.pos && t <= b.pos){
+      const localT = (t - a.pos) / (b.pos - a.pos);
+      return [ lerp(a.rgb[0], b.rgb[0], localT), lerp(a.rgb[1], b.rgb[1], localT), lerp(a.rgb[2], b.rgb[2], localT) ];
+    }
+  }
+  return stops[stops.length-1].rgb;
+}
+
+function generateSpectrumLine(clampedBin){
+  const numBars = 100;
+  const maxDb = 50 + Math.random() * 30;
+  const decay = 0.55 + Math.random() * 0.6;
+  const line = new Array(numBars).fill(0);
+  for(let i=0;i<numBars;i++){
+    const dist = Math.abs(i - clampedBin);
+    const val = maxDb * Math.exp(- decay * dist);
+    line[i] = (val < 0.35) ? 0 : val;
+  }
+  return line;
+}
+
+function animateSpectrum(){
+  if(!isAnimating || currentWavePpm <= 0 || currentMinHz >= currentMaxHz){ isAnimating = false; return; }
+
+  const canvas = document.getElementById('spectrumCanvas');
+  const ctx = setupCanvas(canvas);
+  const dpr = window.devicePixelRatio || 1;
+  const canvasWidth = canvas.width / dpr;
+  const canvasHeight = canvas.height / dpr;
+
+  const now = performance.now();
+  const elapsedSeconds = (now - animationStartTime) / 1000;
+  const cyclesPerSecond = currentWavePpm / 60;
+  const cycleProgress = (elapsedSeconds * cyclesPerSecond) % 1;
+  let fraction = (cycleProgress < 0.5) ? (2 * cycleProgress) : (2 * (1 - cycleProgress));
+
+  const currentFreq = currentMinHz + fraction * (currentMaxHz - currentMinHz);
+
+  const minViz = 14000, maxViz = 71000, numBars = 100;
+  const bin = Math.floor(((currentFreq - minViz) / (maxViz - minViz)) * (numBars - 1));
+  const clampedBin = Math.max(0, Math.min(numBars - 1, bin));
+
+  const cssCard = getComputedStyle(document.documentElement).getPropertyValue('--card') || '#14202a';
+  ctx.fillStyle = cssCard.trim() || '#14202a';
+  ctx.fillRect(0,0,canvasWidth,canvasHeight);
+
+  const marginLeft = 55;
+  const marginBottom = 45;
+  const plotWidth = canvasWidth - marginLeft;
+  const plotHeight = canvasHeight - marginBottom;
+  const xAxisY = canvasHeight - marginBottom;
+  const barWidth = plotWidth / numBars;
+
+  drawAxes(ctx, canvasWidth, canvasHeight);
+
+  if(currentMode === 'fft'){
+    const maxDb = 50 + Math.random()*30;
+    const decay = 0.5 + Math.random()*0.8;
+    for(let i=0;i<numBars;i++){
+      const dist = Math.abs(i - clampedBin);
+      let db = 0;
+      if(dist < 30) db = maxDb * Math.exp(- decay * dist);
+      const hf = Math.min(1, db/100);
+      const height = hf * plotHeight;
+      const x = marginLeft + i * barWidth;
+      const y = xAxisY - height;
+      const hue = 180 - db;
+      ctx.fillStyle = `hsl(${hue}, 70%, ${50 - db*0.1}%)`;
+      ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), height);
+    }
+    const centerX = marginLeft + clampedBin * barWidth + barWidth/2;
+    const centerY = xAxisY - plotHeight * 0.35;
+    const smallR = Math.max(8, barWidth*4);
+    const radial = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, smallR);
+    radial.addColorStop(0, 'rgba(255,100,80,0.22)');
+    radial.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = radial;
+    ctx.beginPath(); ctx.arc(centerX, centerY, smallR, 0, Math.PI*2); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  } else {
+    const lineHeight = 1;
+    const maxLines = Math.floor(plotHeight / lineHeight);
+    const newLine = generateSpectrumLine(clampedBin);
+    waterfallLines.unshift(newLine);
+    if(waterfallLines.length > maxLines) waterfallLines.pop();
+    const tailLen = Math.min(60, maxLines);
+    for(let ly=0; ly<waterfallLines.length; ly++){
+      const line = waterfallLines[ly];
+      const y = ly * lineHeight;
+      for(let i=0;i<numBars;i++){
+        const db = line[i];
+        if(!db) continue;
+        const x = marginLeft + i*barWidth;
+        const lightness = 20 + Math.min(50, db*0.35);
+        ctx.fillStyle = `hsl(200, 70%, ${lightness}%)`;
+        ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), lineHeight);
+      }
+      if(ly < tailLen){
+        const ageT = ly / Math.max(1, tailLen - 1);
+        const rgb = lerpColorStops(ageT);
+        const alphaBase = 0.95 * (1 - ageT);
+        const sigmaBars = 3;
+        const twoSigmaSq = 2 * sigmaBars * sigmaBars;
+        for(let i = Math.max(0, clampedBin - 8); i <= Math.min(numBars-1, clampedBin + 8); i++){
+          const dist = i - clampedBin;
+          const spread = Math.exp(- (dist*dist) / twoSigmaSq);
+          const intensity = spread * alphaBase;
+          if(intensity < 0.005) continue;
+          const x = marginLeft + i * barWidth;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = rgbToCss(rgb[0], rgb[1], rgb[2], Math.min(1, intensity));
+          ctx.fillRect(x, y, Math.max(1, barWidth - 0.6), lineHeight);
+          ctx.globalCompositeOperation = 'source-over';
+        }
+      }
+    }
+  }
+
+  requestAnimationFrame(animateSpectrum);
+}
+
+/* WRITE/CONNECT/NOTIFY & UI wiring */
 async function writeFrame(bytes, label){
   if(!writeChar) throw new Error("Not connected");
   console.log("TX " + label + ": " + bytesToHexUpper(bytes));
@@ -808,12 +839,76 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   return waitForInitAck(featureKey, sliderRaw, 5000);
 }
 
-/* Modal & gear handling (kept same — event wiring follows) */
-/* omitted for brevity — but in the production file include the same modal handlers as before (openFeatureModal, modalSave handler, etc). */
-/* For completeness we wire basic UI controls below: */
+/* Modal handlers (restored & implemented) */
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalToggle = document.getElementById('modalToggle');
+const modalSlider = document.getElementById('modalSlider');
+const modalSliderValue = document.getElementById('modalSliderValue');
+const modalSave = document.getElementById('modalSave');
+const modalReset = document.getElementById('modalReset');
+const modalTitle = document.getElementById('modalTitle');
 
+function openFeatureModal(featureKey){
+  if(!currentInitData) return alert("No INIT data available yet. Send INIT to populate.");
+  const data = currentInitData[featureKey];
+  if(!data) return alert("Feature data missing");
+  editingFeature = featureKey;
+  modalTitle.textContent = `Edit: ${featureKey.toUpperCase()}`;
+  // populate toggle
+  if(data.enabled) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+  // populate slider with value (convert units if needed)
+  let val = 0;
+  if(featureKey === 'beep') val = data.value || 0;
+  else if(featureKey === 'standby' || featureKey === 'shutdown') val = data.value_mV || 0; // mV raw
+  else if(featureKey === 'hiss') val = data.value_pct || 0;
+  modalSlider.value = val;
+  modalSliderValue.textContent = val;
+  // set min/max labels
+  const minLbl = (data.min ?? "--");
+  const maxLbl = (data.max ?? "--");
+  document.getElementById('sliderMinLabel').textContent = minLbl;
+  document.getElementById('sliderMaxLabel').textContent = maxLbl;
+  modalBackdrop.style.display = 'flex';
+}
+
+// toggle click
+modalToggle.addEventListener('click', ()=>{ modalToggle.classList.toggle('on'); });
+modalSlider.addEventListener('input', ()=>{ modalSliderValue.textContent = modalSlider.value; });
+
+modalReset.addEventListener('click', ()=>{
+  if(!editingFeature || !currentInitData) return;
+  const d = currentInitData[editingFeature];
+  if(!d) return;
+  // reset slider to default
+  if(editingFeature === 'beep') modalSlider.value = d.def ?? 0;
+  else if(editingFeature === 'standby' || editingFeature === 'shutdown') modalSlider.value = d.def_mV ?? 0;
+  else if(editingFeature === 'hiss') modalSlider.value = d.def_pct ?? 0;
+  modalSliderValue.textContent = modalSlider.value;
+  // reset toggle to default enabled flag
+  if(d.en_default) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+});
+
+modalSave.addEventListener('click', async ()=>{
+  if(!editingFeature) return;
+  try{
+    const enabledNow = modalToggle.classList.contains('on') ? 1 : 0;
+    const sliderRaw = parseInt(modalSlider.value,10) || 0;
+    modalSave.disabled = true;
+    const ack = await performSaveWrite(editingFeature, enabledNow, sliderRaw);
+    alert(`Saved ${editingFeature} — ACK received`);
+    // request fresh INIT to update UI
+    try{ await sendInitCmd(); await waitForNextInit(3000); }catch(e){console.warn('post-save INIT fetch failed', e);}    
+  }catch(e){ alert(`Save failed: ${e.message || e}`); }
+  finally{ modalSave.disabled = false; modalBackdrop.style.display='none'; editingFeature = null; }
+});
+
+// close modal
+document.getElementById('modalClose').addEventListener('click', ()=>{ modalBackdrop.style.display='none'; editingFeature=null; });
+
+/* wire gear buttons (open modal) */
 document.querySelectorAll('.gear').forEach(g => {
-  g.addEventListener('click', async () => {
+  g.addEventListener('click', async (ev) => {
+    ev.stopPropagation();
     const feature = g.dataset.feature;
     if (currentInitData) { openFeatureModal(feature); return; }
     if (!writeChar) { alert("Not connected. Please connect before editing features."); return; }
@@ -822,7 +917,7 @@ document.querySelectorAll('.gear').forEach(g => {
   });
 });
 
-/* Basic UI wiring again */
+/* basic UI wiring (unchanged) */
 connectButton.addEventListener('click', connect);
 disconnectButton.addEventListener('click', disconnect);
 sendLiveBtn.addEventListener('click', sendLiveCmd);
@@ -843,23 +938,8 @@ document.getElementById('copyParsed').addEventListener('click', async ()=>{
 });
 document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
-/* radio handlers */
 modeFft.addEventListener('change', () => { if(modeFft.checked){ currentMode='fft'; if(currentWavePpm>0 && !isAnimating){ isAnimating=true; animationStartTime=performance.now(); requestAnimationFrame(animateSpectrum); } } });
 modeWaterfall.addEventListener('change', () => { if(modeWaterfall.checked){ currentMode='waterfall'; waterfallLines = []; if(currentWavePpm>0 && !isAnimating){ isAnimating=true; animationStartTime=performance.now(); requestAnimationFrame(animateSpectrum); } } });
-
-/* modal helper stubs used above (openFeatureModal etc) - include full implementations from your prior code */
-function openFeatureModal(featureKey){
-  if(!currentInitData) return alert("No INIT data available yet. Send INIT to populate.");
-  const data = currentInitData[featureKey];
-  if(!data) return alert("Feature data missing");
-  // minimal UI: show the modal and populate slider (full implementation from previous code should be used)
-  const modalBackdrop = document.getElementById('modalBackdrop');
-  modalBackdrop.style.display = 'flex';
-  // (the full feature modal logic from your original file should be included — left concise here)
-}
-
-/* modal close wiring */
-document.getElementById('modalClose').addEventListener('click', ()=>{ document.getElementById('modalBackdrop').style.display='none'; });
 
 /* initial checks */
 if(!navigator.bluetooth){

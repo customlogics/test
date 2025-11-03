@@ -126,6 +126,19 @@
       </div>
 
       <div class="grid">
+        <!-- NEW DEVICE MODE CARD - inserted after voltage for logical flow -->
+        <div class="tile" id="card_mode" style="border-left:6px solid var(--accent-2)">
+          <div class="heading">
+            <!-- device mode icon: simple power/mode symbol -->
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden>
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM13 17h-2v-2h2v2zm0-4h-2V7h2v6z"></path>
+            </svg>
+            Device Status
+          </div>
+          <div class="feature-value" id="card_mode_val">--</div>
+          <div class="sub">From LIVE packet (byte 23)</div>
+        </div>
+
         <div class="tile" id="card_voltage" style="border-left:6px solid var(--accent-1)">
           <div class="heading">
             <!-- battery icon -->
@@ -140,19 +153,6 @@
             <div class="unit muted" id="liveExtra">instant</div>
           </div>
           <div class="sub" id="card_battery_sub">From LIVE packet</div>
-        </div>
-
-        <!-- NEW DEVICE MODE CARD - inserted at start (second in first row for balance) -->
-        <div class="tile" id="card_mode" style="border-left:6px solid var(--accent-2)">
-          <div class="heading">
-            <!-- device mode icon: simple power/mode symbol -->
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden>
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM13 17h-2v-2h2v2zm0-4h-2V7h2v6z"></path>
-            </svg>
-            Device Status
-          </div>
-          <div class="feature-value" id="card_mode_val">--</div>
-          <div class="sub">From LIVE packet</div>
         </div>
 
         <!-- CURRENT card -->
@@ -493,7 +493,7 @@ function parseLivePacket(arr) {
   if (arr.length < 33) return { error: `LIVE packet too short: ${arr.length} bytes (need ≥33)` };
   if (!isTagAt(arr, 0, [0xFD,0xFC,0xFB,0xFA])) return { error: "Invalid frame start" };
   const len = (arr[5] << 8) | arr[4];
-  if (len !== 0x0017) return { error: `Invalid data len: ${len} (expected 23)` };
+  if (len !== 23) return { error: `Invalid data len: ${len} (expected 23)` };
   if (!isTagAt(arr, 29, [0x04,0x03,0x02,0x01])) return { error: "Invalid frame end" };
   if (!isTagAt(arr, 6, [0x4C,0x49,0x56,0x45])) return { error: "Not a LIVE packet" };
 
@@ -510,18 +510,18 @@ function parseLivePacket(arr) {
   const max_khz = (max_hz / 1000).toFixed(1);
   const wave_ppm = view.getUint16(20, true);
   const pattern_enum = arr[22];
-  const status_enum = arr[23];
+  const status_enum = arr[23]; // NEW: Device status enum
   const days = view.getUint16(24, true);
   const hh = arr[26];
   const mm = arr[27];
   const ss = arr[28];
   const uptime_str = `${days} Days ${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')} (HH:MM:SS)`;
 
-  // Pattern names (based on enum; adjust if needed - e.g., 0=Off, 1=Linear, 2=Sine, 3=Zig-Zag)
-  const patternNames = ["Off", "Linear", "Sine", "Zig-Zag", "Random"];
+  // Pattern names (adjust based on actual enum values)
+  const patternNames = ["Off", "Linear", "Sine", "Zig-Zag"];
   const pattern = patternNames[pattern_enum] || `Unknown (${pattern_enum})`;
 
-  // Status names (from updated spec)
+  // Status names (from spec)
   const statusNames = ["Idle mode", "Run mode", "Shutdown mode", "Standby mode"];
   const status = statusNames[status_enum] || `Unknown (${status_enum})`;
 
@@ -533,19 +533,19 @@ function parseLivePacket(arr) {
     max_khz,
     wave_ppm,
     pattern,
-    status,
+    status, // NEW
     days,
     uptime_str,
     _rawBuf: arr
   };
 }
 
-/* Parse INIT (unchanged) */
+/* Parse INIT (unchanged - placeholder for original implementation) */
 function parseInitPacket(arr) {
-  // Implementation for INIT parsing (assumed existing; not modified)
   if (arr.length < 51) return { error: "INIT too short" };
-  // ... (existing logic for beep, standby, etc.)
-  return { /* parsed data */ };
+  // ... (original INIT parsing logic here - unchanged)
+  // For completeness, assume it returns { beep: {...}, standby: {...}, etc. }
+  return { /* parsed INIT data */ };
 }
 
 /* Show LIVE - UPDATED to include status */
@@ -554,20 +554,20 @@ function showLive(data) {
     console.warn("LIVE parse error:", data.error);
     return;
   }
-  card_battery.textContent = data.voltage_v + ' V';
-  card_current_val.textContent = data.current_ma + ' mA';
-  card_temp_value.textContent = data.temp_c + ' °C';
-  card_minfreq.textContent = data.min_khz + ' kHz';
-  card_maxfreq.textContent = data.max_khz + ' kHz';
-  card_waveval.textContent = data.wave_ppm;
-  card_pattern_val.textContent = data.pattern;
-  card_mode_val.textContent = data.status;  // NEW
-  card_days.textContent = data.days + ' Days';
-  card_hhmmss.textContent = data.uptime_str;
-  spec_minfreq.textContent = data.min_khz + ' kHz';
-  spec_maxfreq.textContent = data.max_khz + ' kHz';
-  spec_wave.textContent = data.wave_ppm + ' ppm';
-  spec_pattern.textContent = data.pattern;
+  document.getElementById('card_battery').textContent = data.voltage_v + ' V';
+  document.getElementById('card_current_val').textContent = data.current_ma + ' mA';
+  document.getElementById('card_temp_value').textContent = data.temp_c + ' °C';
+  document.getElementById('card_minfreq').textContent = data.min_khz + ' kHz';
+  document.getElementById('card_maxfreq').textContent = data.max_khz + ' kHz';
+  document.getElementById('card_waveval').textContent = data.wave_ppm;
+  document.getElementById('card_pattern_val').textContent = data.pattern;
+  document.getElementById('card_mode_val').textContent = data.status; // NEW
+  document.getElementById('card_days').textContent = data.days + ' Days';
+  document.getElementById('card_hhmmss').textContent = data.uptime_str;
+  document.getElementById('spec_minfreq').textContent = data.min_khz + ' kHz';
+  document.getElementById('spec_maxfreq').textContent = data.max_khz + ' kHz';
+  document.getElementById('spec_wave').textContent = data.wave_ppm + ' ppm';
+  document.getElementById('spec_pattern').textContent = data.pattern;
   currentWavePpm = data.wave_ppm;
 
   // Trigger animation if needed
@@ -580,11 +580,12 @@ function showLive(data) {
 
 /* Show INIT (unchanged) */
 function showInit(data) {
-  // Existing logic to update feature cards (beep_enabled_card, etc.)
+  // Original logic to update feature cards
   currentInitData = data;
+  // ... (update beep_enabled_card, etc.)
 }
 
-/* BLE connection */
+/* BLE connection - UNCHANGED */
 async function connect() {
   try {
     device = await navigator.bluetooth.requestDevice({
@@ -600,8 +601,6 @@ async function connect() {
     notifyChar.addEventListener('characteristicvaluechanged', onNotify);
 
     deviceName.textContent = device.name || device.id.slice(-4);
-    bleText.textContent = "Connected";
-    statusDot.style.background = "#27b56b";
 
     connectButton.disabled = true;
     disconnectButton.disabled = false;
@@ -625,8 +624,6 @@ function onDeviceDisconnected(event) {
   stopAutoLive();
   isAnimating = false;
   deviceName.textContent = "Not connected";
-  bleText.textContent = "Disconnected";
-  statusDot.style.background = "#ff6b6b";
 
   connectButton.disabled = false;
   disconnectButton.disabled = true;
@@ -653,8 +650,6 @@ async function disconnect() {
     console.error("Error during disconnect:", e);
   } finally {
     deviceName.textContent = "Not connected";
-    bleText.textContent = "Disconnected";
-    statusDot.style.background = "#ff6b6b";
 
     connectButton.disabled = false;
     disconnectButton.disabled = true;
@@ -706,7 +701,7 @@ function onNotify(ev){
   appendRaw(arr, '');
 }
 
-/* Auto LIVE */
+/* Auto LIVE - UNCHANGED */
 function startAutoLive(){
   if(autoIntervalId) return;
   if(!writeChar){ alert("Not connected"); return; }
@@ -723,7 +718,7 @@ function stopAutoLive(){
   stopAutoBtn.disabled = true;
 }
 
-/* waitForNextInit — used when gear pressed and we need to request INIT and wait for it */
+/* waitForNextInit — UNCHANGED */
 function waitForNextInit(timeoutMs = 3000) {
   if (awaitingInitPromise) return awaitingInitPromise;
   let timer;
@@ -741,7 +736,7 @@ function waitForNextInit(timeoutMs = 3000) {
   return awaitingInitPromise;
 }
 
-/* WAIT-for-ACK logic: create pendingSave inside waitForInitAck */
+/* WAIT-for-ACK logic: UNCHANGED */
 function waitForInitAck(feature, value, timeoutMs = 5000){
   if(pendingSave) throw new Error("pendingSave already exists");
   return new Promise((resolve, reject) => {
@@ -759,7 +754,7 @@ function waitForInitAck(feature, value, timeoutMs = 5000){
   });
 }
 
-/* build & send save frame, then wait for INIT ack */
+/* build & send save frame, then wait for INIT ack - UNCHANGED */
 async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   if(!writeChar) throw new Error("Not connected");
   if(writeInProgress) throw new Error("Write in progress");
@@ -785,7 +780,7 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   return waitForInitAck(featureKey, sliderRaw, 5000);
 }
 
-/* modal helpers */
+/* modal helpers - UNCHANGED */
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
@@ -852,7 +847,7 @@ modalClose.addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', (ev)=>{ if(ev.target === modalBackdrop) closeModal(); });
 function closeModal(){ modalBackdrop.style.display = 'none'; editingFeature = null; }
 
-/* modal save uses performSaveWrite (which waits for ACK) */
+/* modal save uses performSaveWrite (which waits for ACK) - UNCHANGED */
 modalSave.addEventListener('click', async ()=>{
   if(!editingFeature || !currentInitData){ closeModal(); return; }
   if(!writeChar) { alert("Not connected — can't send save command"); return; }
@@ -879,7 +874,7 @@ modalSave.addEventListener('click', async ()=>{
   }
 });
 
-/* gear button wiring */
+/* gear button wiring - UNCHANGED */
 document.querySelectorAll('.gear').forEach(g => {
   g.addEventListener('click', async () => {
     const feature = g.dataset.feature;
@@ -898,7 +893,7 @@ document.querySelectorAll('.gear').forEach(g => {
   });
 });
 
-/* UI wiring for other controls */
+/* UI wiring for other controls - REMOVED non-existent copy buttons */
 const connectButton = document.getElementById('connectButton');
 const disconnectButton = document.getElementById('disconnectButton');
 const sendLiveBtn = document.getElementById('sendLiveBtn');
@@ -910,8 +905,6 @@ const forceParse = document.getElementById('forceParse');
 const recvRaw = document.getElementById('recvRaw');
 const autoStatus = document.getElementById('autoStatus');
 const deviceName = document.getElementById('deviceName');
-const bleText = document.querySelector('.ble-status'); // assume exists or adjust
-const statusDot = document.querySelector('.status-dot'); // assume exists or adjust
 const card_battery = document.getElementById('card_battery');
 const card_current_val = document.getElementById('card_current_val');
 const card_temp_value = document.getElementById('card_temp_value');
@@ -919,7 +912,7 @@ const card_minfreq = document.getElementById('card_minfreq');
 const card_maxfreq = document.getElementById('card_maxfreq');
 const card_waveval = document.getElementById('card_waveval');
 const card_pattern_val = document.getElementById('card_pattern_val');
-const card_mode_val = document.getElementById('card_mode_val');  // NEW
+const card_mode_val = document.getElementById('card_mode_val'); // NEW
 const card_days = document.getElementById('card_days');
 const card_hhmmss = document.getElementById('card_hhmmss');
 const spec_minfreq = document.getElementById('spec_minfreq');
@@ -940,24 +933,12 @@ clearRaw.addEventListener('click', ()=> recvRaw.innerHTML = '');
 forceParse.addEventListener('click', ()=>{
   if(!lastPacket) return alert("No packet available");
   if(!isTagAt(lastPacket, 6, "LIVE")) return alert("Latest packet does not have 'LIVE' at bytes 6..9 — parsing skipped.");
-  if(lastPacket.length < 33) return alert("LIVE packet too short (need ≥33 bytes).");  // UPDATED
+  if(lastPacket.length < 33) return alert("LIVE packet too short (need ≥33 bytes).");
   const parsed = parseLivePacket(lastPacket);
   if(parsed.error) alert(parsed.error); else showLive(parsed);
 });
-document.getElementById('copyParsed').addEventListener('click', async ()=>{
-  const lines = [
-    `Battery (V): ${card_battery.textContent}`,
-    `Current (mA): ${card_current_val.textContent}`,
-    `Temp (°C): ${card_temp_value.textContent}`,
-    `Min(kHz): ${card_minfreq.textContent}`,
-    `Max(kHz): ${card_maxfreq.textContent}`,
-    `Status: ${card_mode_val.textContent}`  // NEW
-  ].join("\n");
-  await navigator.clipboard.writeText(lines); alert("LIVE parsed copied");
-});
-document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
 
-/* Spectrum mode switching */
+/* Spectrum mode switching - UNCHANGED */
 modeFft.addEventListener('change', () => {
   if (modeFft.checked) {
     currentMode = 'fft';
@@ -980,34 +961,34 @@ modeWaterfall.addEventListener('change', () => {
   }
 });
 
-/* Animation (unchanged; uses currentWavePpm, min_khz, max_khz for interpolation) */
+/* Animation - UNCHANGED (uses min/max kHz interpolation) */
 function animateSpectrum(now) {
   const ctx = spectrumCanvas.getContext('2d');
   const w = spectrumCanvas.width;
   const h = spectrumCanvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  const numPoints = 100; // e.g., 100 points between min and max
-  const freqRange = parseFloat(card_maxfreq.textContent) - parseFloat(card_minfreq.textContent.replace(' kHz', ''));
+  const numPoints = 100;
+  const minKHz = parseFloat(card_minfreq.textContent);
+  const maxKHz = parseFloat(card_maxfreq.textContent);
+  const freqRange = maxKHz - minKHz;
   const ppm = currentWavePpm;
 
   if (currentMode === 'waterfall') {
-    // Shift lines down
     waterfallLines.push(new Array(numPoints).fill(0));
     if (waterfallLines.length > h) waterfallLines.shift();
     for (let y = 0; y < waterfallLines.length; y++) {
       const line = waterfallLines[waterfallLines.length - 1 - y];
       for (let x = 0; x < numPoints; x++) {
-        const intensity = line[x]; // Simulate or from data
+        const intensity = line[x];
         ctx.fillStyle = `hsl(200, 50%, ${intensity * 50}%)`;
         ctx.fillRect(x * (w / numPoints), y, w / numPoints, 1);
       }
     }
   } else if (currentMode === 'fft') {
-    // FFT simulation
     for (let x = 0; x < w; x++) {
-      const freq = (x / w) * freqRange + parseFloat(card_minfreq.textContent.replace(' kHz', ''));
-      const amp = Math.sin(now / 1000 + freq * ppm / 1000) * 0.5 + 0.5; // Placeholder
+      const freq = (x / w) * freqRange + minKHz;
+      const amp = Math.sin(now / 1000 + freq * ppm / 1000) * 0.5 + 0.5;
       ctx.fillStyle = `hsl(0, 100%, ${amp * 100}%)`;
       ctx.fillRect(x, h - amp * h, 1, amp * h);
     }
@@ -1016,7 +997,7 @@ function animateSpectrum(now) {
   if (isAnimating) requestAnimationFrame(animateSpectrum);
 }
 
-/* initial checks */
+/* initial checks - UNCHANGED */
 if(!navigator.bluetooth){
   alert("Web Bluetooth not available in this browser.");
   connectButton.disabled = true;
@@ -1025,16 +1006,19 @@ if(!navigator.bluetooth){
   stopAutoBtn.disabled = true;
 }
 
-/* Handle canvas resize */
+/* Handle canvas resize - FIXED to set canvas dimensions properly */
 window.addEventListener('resize', () => {
   if (isAnimating) {
     animationStartTime = performance.now();
     requestAnimationFrame(animateSpectrum);
   }
-  // Resize canvas
   const rect = spectrumCanvas.getBoundingClientRect();
-  spectrumCanvas.width = rect.width * window.devicePixelRatio;
-  spectrumCanvas.height = rect.height * window.devicePixelRatio;
+  const dpr = window.devicePixelRatio || 1;
+  spectrumCanvas.width = rect.width * dpr;
+  spectrumCanvas.height = rect.height * dpr;
+  spectrumCanvas.style.width = rect.width + 'px';
+  spectrumCanvas.style.height = rect.height + 'px';
+  if (isAnimating) requestAnimationFrame(animateSpectrum);
 });
   </script>
 </body>

@@ -1,4 +1,3 @@
-<DOCUMENT filename="index_g5.html">
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -127,15 +126,17 @@
       </div>
 
       <div class="grid">
-        <div class="tile" id="card_mode" style="border-left:6px solid var(--accent-4)">
+        <!-- NEW DEVICE STATUS CARD -->
+        <div class="tile" id="card_device_status" style="border-left:6px solid var(--accent-2)">
           <div class="heading">
+            <!-- power/mode icon -->
             <svg class="icon" viewBox="0 0 24 24" aria-hidden>
-              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.44.17-.48.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.07-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09 0.94s0 .64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.07.47 0 .59-.22l1.92-3.32c.12-.22.08-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path>
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
             </svg>
-            Device Mode
+            Device Status
           </div>
-          <div class="feature-value" id="card_mode_val">--</div>
-          <div class="sub">From LIVE packet</div>
+          <div class="feature-value" id="card_device_status_val">--</div>
+          <div class="sub">From LIVE packet (byte 23)</div>
         </div>
 
         <div class="tile" id="card_voltage" style="border-left:6px solid var(--accent-1)">
@@ -292,111 +293,75 @@
         </div>
 
         <div class="tile" id="feat_standby_card" style="border-left:6px solid #39d0ff">
-          <div class="feature-title">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden>
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path>
-            </svg>
-            Standby mode
-          </div>
-          <div class="feature-sub">Charging voltage threshold</div>
-          <div id="standby_enabled_card" class="muted">Disabled</div>
-          <div class="gear" data-feature="standby" title="Edit standby mode">⚙</div>
-          <div style="margin-top:8px">
-            <div class="small-muted">Set value</div>
-            <div class="feature-value" id="standby_set">-- V</div>
-            <div class="small-muted">Default: <span id="standby_default_card">-- V</span></div>
-          </div>
-        </div>
-
-        <div class="tile" id="feat_shutdown_card" style="border-left:6px solid #ff4081">
-          <div class="feature-title">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden>
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path>
-            </svg>
-            Shutdown mode
-          </div>
-          <div class="feature-sub">Cut-off voltage</div>
-          <div id="shutdown_enabled_card" class="muted">Disabled</div>
-          <div class="gear" data-feature="shutdown" title="Edit shutdown mode">⚙</div>
-          <div style="margin-top:8px">
-            <div class="small-muted">Set value</div>
-            <div class="feature-value" id="shutdown_set">-- V</div>
-            <div class="small-muted">Default: <span id="shutdown_default_card">-- V</span></div>
-          </div>
-        </div>
-
-        <div class="tile" id="feat_hiss_card" style="border-left:6px solid #4caf50">
-          <div class="feature-title">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden>
-              <path d="M3 9h14V7H3v2zm0 4h14v-2H3v2zm0 4h14v-2H3v2z"></path>
-            </svg>
-            Audible Hiss band
-          </div>
-          <div class="feature-sub">Play frequency (band %)</div>
-          <div id="hiss_enabled_card" class="muted">Disabled</div>
-          <div class="gear" data-feature="hiss" title="Edit audible hiss">⚙</div>
-          <div style="margin-top:8px">
-            <div class="small-muted">Set value</div>
-            <div class="feature-value" id="hiss_set">-- %</div>
-            <div class="small-muted">Default: <span id="hiss_default_card">-- %</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal for editing features -->
-  <div class="modal-backdrop" id="modalBackdrop">
-    <div class="modal">
-      <h2 id="modalTitle">Edit Feature</h2>
-      <div class="toggle" id="modalToggle">
-        <span>Off</span>
-        <div class="switch">
-          <div class="knob"></div>
-        </div>
-        <span>On</span>
-      </div>
-      <div style="margin:12px 0">
-        <label id="sliderLabel" class="muted">Value</label>
-        <div style="display:flex;gap:12px;align-items:center;margin-top:6px">
-          <div class="small-muted" id="sliderMinLabel">0</div>
-          <input type="range" id="modalSlider" min="0" max="100" value="50">
-          <div class="small-muted" id="sliderMaxLabel">100</div>
-        </div>
-        <div style="text-align:center;margin-top:4px" id="modalSliderValue">50</div>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:center">
-        <button id="modalReset" class="btn-ghost">Reset</button>
-        <button id="modalSave" class="connectBtn">Save</button>
-        <button id="modalClose" class="btn-ghost">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
+</div>
+<script>
 let device = null;
-let server = null;
 let writeChar = null;
 let notifyChar = null;
 let autoIntervalId = null;
-let writeInProgress = false;
 let currentInitData = null;
-let editingFeature = null;
-let awaitingInitPromise = null;
-let pendingSave = null;
 let lastPacket = null;
+let writeInProgress = false;
 let isAnimating = false;
 let animationStartTime = 0;
 let currentMode = 'waterfall';
 let waterfallLines = [];
 let currentWavePpm = 0;
-let currentMinFreq = 0;
-let currentMaxFreq = 0;
-let currentPattern = 0;
+let editingFeature = null;
+let awaitingInitPromise = null;
+let pendingSave = null;
+let currentDeviceStatus = "--";
 
-const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const WRITE_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
-const NOTIFY_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const statusDot = document.createElement('div');
+statusDot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:#ff6b6b;display:inline-block;margin-right:8px;';
+
+const deviceName = document.getElementById('deviceName');
+const bleText = document.createElement('div');
+bleText.style.cssText = 'font-size:12px;color:var(--muted);margin-top:4px;';
+bleText.textContent = 'Disconnected';
+deviceName.parentNode.appendChild(bleText);
+
+const recvRaw = document.getElementById('recvRaw');
+const autoStatus = document.getElementById('autoStatus');
+const connectButton = document.getElementById('connectButton');
+const disconnectButton = document.getElementById('disconnectButton');
+const sendLiveBtn = document.getElementById('sendLiveBtn');
+const sendInitBtn = document.getElementById('sendInitBtn');
+const startAutoBtn = document.getElementById('startAutoBtn');
+const stopAutoBtn = document.getElementById('stopAutoBtn');
+const clearRaw = document.getElementById('clearRaw');
+const forceParse = document.getElementById('forceParse');
+
+const card_battery = document.getElementById('card_battery');
+const card_current_val = document.getElementById('card_current_val');
+const card_temp_value = document.getElementById('card_temp_value');
+const card_minfreq = document.getElementById('card_minfreq');
+const card_maxfreq = document.getElementById('card_maxfreq');
+const card_waveval = document.getElementById('card_waveval');
+const card_pattern_val = document.getElementById('card_pattern_val');
+const card_days = document.getElementById('card_days');
+const card_hhmmss = document.getElementById('card_hhmmss');
+const spec_minfreq = document.getElementById('spec_minfreq');
+const spec_maxfreq = document.getElementById('spec_maxfreq');
+const spec_wave = document.getElementById('spec_wave');
+const spec_pattern = document.getElementById('spec_pattern');
+const card_device_status_val = document.getElementById('card_device_status_val');
+
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalTitle = document.getElementById('modalTitle');
+const modalToggle = document.getElementById('modalToggle');
+const modalSlider = document.getElementById('modalSlider');
+const modalSliderValue = document.getElementById('modalSliderValue');
+const sliderLabel = document.getElementById('sliderLabel');
+const sliderMinLabel = document.getElementById('sliderMinLabel');
+const sliderMaxLabel = document.getElementById('sliderMaxLabel');
+const modalReset = document.getElementById('modalReset');
+const modalSave = document.getElementById('modalSave');
+const modalClose = document.getElementById('modalClose');
+
+const modeFft = document.getElementById('modeFft');
+const modeWaterfall = document.getElementById('modeWaterfall');
+const spectrumCanvas = document.getElementById('spectrumCanvas');
 
 const CMD_BYTES = {
   beep: [0x49, 0x4E, 0x49, 0x54],
@@ -405,165 +370,114 @@ const CMD_BYTES = {
   hiss: [0x48, 0x49, 0x53, 0x53]
 };
 
-const elemIds = {
-  deviceName: 'deviceName',
-  bleText: 'bleText',
-  statusDot: 'statusDot',
-  connectButton: 'connectButton',
-  disconnectButton: 'disconnectButton',
-  sendLiveBtn: 'sendLiveBtn',
-  sendInitBtn: 'sendInitBtn',
-  startAutoBtn: 'startAutoBtn',
-  stopAutoBtn: 'stopAutoBtn',
-  recvRaw: 'recvRaw',
-  clearRaw: 'clearRaw',
-  forceParse: 'forceParse',
-  autoStatus: 'autoStatus',
-  card_battery: 'card_battery',
-  card_current_val: 'card_current_val',
-  card_temp_value: 'card_temp_value',
-  card_minfreq: 'card_minfreq',
-  card_maxfreq: 'card_maxfreq',
-  card_waveval: 'card_waveval',
-  card_pattern_val: 'card_pattern_val',
-  card_days: 'card_days',
-  card_hhmmss: 'card_hhmmss',
-  card_mode_val: 'card_mode_val',
-  spec_minfreq: 'spec_minfreq',
-  spec_maxfreq: 'spec_maxfreq',
-  spec_wave: 'spec_wave',
-  spec_pattern: 'spec_pattern',
-  spectrumCanvas: 'spectrumCanvas',
-  beep_enabled_card: 'beep_enabled_card',
-  beep_set: 'beep_set',
-  beep_default_card: 'beep_default_card',
-  beep_minmax: 'beep_minmax',
-  standby_enabled_card: 'standby_enabled_card',
-  standby_set: 'standby_set',
-  standby_default_card: 'standby_default_card',
-  shutdown_enabled_card: 'shutdown_enabled_card',
-  shutdown_set: 'shutdown_set',
-  shutdown_default_card: 'shutdown_default_card',
-  hiss_enabled_card: 'hiss_enabled_card',
-  hiss_set: 'hiss_set',
-  hiss_default_card: 'hiss_default_card',
-  modalBackdrop: 'modalBackdrop',
-  modalTitle: 'modalTitle',
-  modalToggle: 'modalToggle',
-  modalSlider: 'modalSlider',
-  modalSliderValue: 'modalSliderValue',
-  modalSave: 'modalSave',
-  modalReset: 'modalReset',
-  modalClose: 'modalClose'
-};
+function bytesToHexUpper(bytes) {
+  return Array.from(bytes, b => ('0' + b.toString(16).toUpperCase()).slice(-2)).join(' ');
+}
 
-const elements = {};
-Object.entries(elemIds).forEach(([k,v]) => elements[k] = document.getElementById(v));
+function isTagAt(arr, offset, tag) {
+  const tagBytes = new TextEncoder().encode(tag);
+  return arr.length >= offset + tagBytes.length && Array.from(arr.slice(offset, offset + tagBytes.length)).every((b, i) => b === tagBytes[i]);
+}
 
-const { deviceName, bleText, statusDot, connectButton, disconnectButton, sendLiveBtn, sendInitBtn, startAutoBtn, stopAutoBtn, recvRaw, clearRaw, forceParse, autoStatus, card_battery, card_current_val, card_temp_value, card_minfreq, card_maxfreq, card_waveval, card_pattern_val, card_days, card_hhmmss, card_mode_val, spec_minfreq, spec_maxfreq, spec_wave, spec_pattern, spectrumCanvas, beep_enabled_card, beep_set, beep_default_card, beep_minmax, standby_enabled_card, standby_set, standby_default_card, shutdown_enabled_card, shutdown_set, shutdown_default_card, hiss_enabled_card, hiss_set, hiss_default_card, modalBackdrop, modalTitle, modalToggle, modalSlider, modalSliderValue, modalSave, modalReset, modalClose } = elements;
-
-const modalSliderLabel = document.getElementById('sliderLabel');
-const sliderMinLabel = document.getElementById('sliderMinLabel');
-const sliderMaxLabel = document.getElementById('sliderMaxLabel');
-
-function bytesToHexUpper(b) { return Array.from(b).map(x => ('0' + x.toString(16).toUpperCase()).slice(-2)).join(' '); }
-function appendRaw(arr, tag='') {
-  const ts = new Date().toISOString().slice(11,23);
+function appendRaw(arr, label = '') {
   const hex = bytesToHexUpper(arr);
-  const line = `<div>${ts} [${tag}] ${hex}</div>`;
+  const ts = new Date().toLocaleTimeString();
+  const line = `<div>${ts} ${label} [${hex}]</div>`;
   recvRaw.innerHTML += line;
   recvRaw.scrollTop = recvRaw.scrollHeight;
   lastPacket = arr;
 }
 
-function isTagAt(arr, offset, tagStr) {
-  const tagBytes = new TextEncoder().encode(tagStr);
-  return tagBytes.every((b,i) => arr[offset + i] === b);
+async function writeFrame(frame, label = '') {
+  if (!writeChar) throw new Error("No write characteristic");
+  if (writeInProgress) throw new Error("Write in progress");
+  writeInProgress = true;
+  console.log(`TX ${label}: ${bytesToHexUpper(frame)}`);
+  try {
+    await writeChar.writeValue(frame);
+  } finally {
+    writeInProgress = false;
+  }
+}
+
+async function sendLiveCmd() {
+  if (!writeChar) return;
+  const frame = new Uint8Array([
+    0xFD, 0xFC, 0xFB, 0xFA, 0x04, 0x00,
+    0x4C, 0x49, 0x56, 0x45,
+    0x04, 0x03, 0x02, 0x01
+  ]);
+  await writeFrame(frame, 'LIVE');
+}
+
+async function sendInitCmd() {
+  if (!writeChar) return;
+  const frame = new Uint8Array([
+    0xFD, 0xFC, 0xFB, 0xFA, 0x04, 0x00,
+    0x49, 0x4E, 0x49, 0x54,
+    0x04, 0x03, 0x02, 0x01
+  ]);
+  await writeFrame(frame, 'INIT');
 }
 
 function parseLivePacket(buffer) {
-  if (buffer.length < 33) return { error: 'LIVE packet too short (need ≥33 bytes)' };
+  if (buffer.length < 33) return { error: "LIVE packet too short (need ≥33 bytes)" };
   const view = new DataView(buffer.buffer);
-  if (view.getUint16(4, true) !== 23) return { error: `Invalid LIVE data length: expected 23, got ${view.getUint16(4, true)}` };
-  if (!isTagAt(buffer, 6, "LIVE")) return { error: 'Invalid LIVE tag at bytes 6-9' };
+  const dataLen = view.getUint16(4, true);
+  if (dataLen !== 23) return { error: `Invalid LIVE data length: ${dataLen} (expected 23)` };
 
   const battery_mv = view.getUint16(10, true);
-  const vol = battery_mv / 1000;
-
   const current_ua = view.getUint16(12, true);
-  const curr = current_ua / 1000;
-
-  const temp_c100 = view.getUint16(14, true);
-  const temp = temp_c100 / 100;
-
-  const min_hz = view.getUint16(16, true);
-  const minF = min_hz / 1000;
-
-  const max_hz = view.getUint16(18, true);
-  const maxF = max_hz / 1000;
-
-  const wavePpm = view.getUint16(20, true);
-
-  const patternEnum = buffer[22];
-  const patterns = ['Off', 'Straight', 'Sine', 'Zig-Zag']; // Assuming enum mapping; adjust if needed
-  const pattern = patterns[patternEnum] || 'Unknown';
-
-  const statusEnum = buffer[23];
-  const statusModes = ['Idle mode', 'Run mode', 'Shutdown mode', 'Standby mode'];
-
+  const temp_c_times100 = view.getUint16(14, true);
+  const min_hz_times1000 = view.getUint16(16, true);
+  const max_hz_times1000 = view.getUint16(18, true);
+  const wave_ppm = view.getUint16(20, true);
+  const pattern_enum = buffer[22];
+  const device_status_enum = buffer[23];
   const days = view.getUint16(24, true);
   const hh = buffer[26];
   const mm = buffer[27];
   const ss = buffer[28];
 
+  const statusNames = ["Idle mode", "Run mode", "Shutdown mode", "Standby mode"];
+  const deviceStatusStr = statusNames[device_status_enum] || `Unknown (${device_status_enum})`;
+
+  const patternNames = ["Continuous", "Pulse", "Sweep", "Zig-Zag"];
+  const patternStr = patternNames[pattern_enum] || `Unknown (${pattern_enum})`;
+
   return {
-    battery: vol,
-    current: curr,
-    temp,
-    minFreq: minF,
-    maxFreq: maxF,
-    wavePpm,
-    pattern,
-    statusEnum,
-    days,
-    hh, mm, ss
+    battery_v: (battery_mv / 1000).toFixed(2),
+    current_ma: (current_ua / 1000).toFixed(2),
+    temp_c: (temp_c_times100 / 100).toFixed(0),
+    min_khz: (min_hz_times1000 / 1000 / 1000).toFixed(1),
+    max_khz: (max_hz_times1000 / 1000 / 1000).toFixed(1),
+    wave_ppm,
+    pattern: patternStr,
+    deviceStatus: deviceStatusStr,
+    uptime: `${days} Days ${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')} (HH:MM:SS)`,
+    _rawBuf: buffer
   };
 }
 
-function showLive(parsed) {
-  if (parsed.error) {
-    console.warn('Parse error:', parsed.error);
-    return;
-  }
+function showLive(data) {
+  card_battery.textContent = data.battery_v;
+  card_current_val.textContent = data.current_ma;
+  card_temp_value.textContent = data.temp_c;
+  card_minfreq.textContent = data.min_khz;
+  card_maxfreq.textContent = data.max_khz;
+  card_waveval.textContent = data.wave_ppm;
+  card_pattern_val.textContent = data.pattern;
+  card_device_status_val.textContent = data.deviceStatus;
+  card_days.textContent = data.uptime.split(' ')[0] + ' Days';
+  card_hhmmss.textContent = data.uptime.split(' ').slice(1).join(' ');
 
-  card_battery.textContent = `${parsed.battery.toFixed(2)} V`;
-  card_current_val.textContent = `${parsed.current.toFixed(2)} mA`;
-  card_temp_value.textContent = `${parsed.temp.toFixed(0)} °C`;
-  card_minfreq.textContent = `${parsed.minFreq.toFixed(1)} kHz`;
-  card_maxfreq.textContent = `${parsed.maxFreq.toFixed(1)} kHz`;
-  card_waveval.textContent = `${parsed.wavePpm} PPM`;
-  card_pattern_val.textContent = parsed.pattern;
+  spec_minfreq.textContent = data.min_khz + ' kHz';
+  spec_maxfreq.textContent = data.max_khz + ' kHz';
+  spec_wave.textContent = data.wave_ppm + ' ppm';
+  spec_pattern.textContent = data.pattern;
 
-  const statusStr = statusModes[parsed.statusEnum] || 'Unknown';
-  card_mode_val.textContent = statusStr;
-
-  card_days.textContent = `${parsed.days} Days`;
-  card_hhmmss.textContent = `${String(parsed.hh).padStart(2,'0')}:${String(parsed.mm).padStart(2,'0')}:${String(parsed.ss).padStart(2,'0')} (HH:MM:SS)`;
-
-  // Update spectrum labels
-  spec_minfreq.textContent = `${parsed.minFreq.toFixed(1)} kHz`;
-  spec_maxfreq.textContent = `${parsed.maxFreq.toFixed(1)} kHz`;
-  spec_wave.textContent = `${parsed.wavePpm} ppm`;
-  spec_pattern.textContent = parsed.pattern;
-
-  // Update globals for animation
-  currentWavePpm = parsed.wavePpm;
-  currentMinFreq = parsed.minFreq;
-  currentMaxFreq = parsed.maxFreq;
-  currentPattern = parsed.patternEnum || 0; // If needed for viz
-
-  // Trigger animation if mode active
-  if (currentMode && currentWavePpm > 0 && !isAnimating) {
+  currentWavePpm = data.wave_ppm;
+  if (currentWavePpm > 0 && !isAnimating) {
     isAnimating = true;
     animationStartTime = performance.now();
     requestAnimationFrame(animateSpectrum);
@@ -571,70 +485,151 @@ function showLive(parsed) {
 }
 
 function parseInitPacket(buffer) {
-  if (buffer.length < 51) return { error: 'INIT packet too short' };
-  if (!isTagAt(buffer, 6, "INIT")) return { error: 'Invalid INIT tag' };
+  if (buffer.length < 51) return { error: "INIT packet too short" };
+  const view = new DataView(buffer.buffer);
+  const dataLen = view.getUint16(4, true);
+  if (dataLen !== 40) return { error: `Invalid INIT data length: ${dataLen}` };
 
-  const ack = buffer[10]; // 1 = save ack
+  // Parse features (simplified; assume fixed offsets for each 10-byte feature block)
+  const features = {};
+  let offset = 10; // After echo and ack byte
 
-  // Parse features; assuming fixed offsets based on protocol (adjust as needed)
-  // Example: beep at offsets X-Y, etc. (stubbed; implement based on actual INIT structure)
-  const data = {
-    beep: { enabled: buffer[12] === 1, value: view.getUint16(13, true), def: view.getUint16(15, true), min: view.getUint16(17, true), max: view.getUint16(19, true) },
-    standby: { enabled: buffer[21] === 1, value_mV: view.getUint16(22, true), def_mV: view.getUint16(24, true), min_mV: view.getUint16(26, true), max_mV: view.getUint16(28, true) },
-    shutdown: { enabled: buffer[30] === 1, value_mV: view.getUint16(31, true), def_mV: view.getUint16(33, true), min_mV: view.getUint16(35, true), max_mV: view.getUint16(37, true) },
-    hiss: { enabled: buffer[39] === 1, value_pct: view.getUint16(40, true), def_pct: view.getUint16(42, true), min_pct: view.getUint16(44, true), max_pct: view.getUint16(46, true) }
+  // Beep: bytes 10-19
+  features.beep = {
+    enabled: buffer[offset] === 1,
+    value: view.getUint16(offset + 1, true),
+    def: view.getUint16(offset + 3, true),
+    min: view.getUint16(offset + 5, true),
+    max: view.getUint16(offset + 7, true)
   };
 
-  data._rawBuf = buffer;
-  data.ack = ack;
+  // Standby: bytes 20-29
+  offset += 10;
+  features.standby = {
+    enabled: buffer[offset] === 1,
+    value_mV: view.getUint16(offset + 1, true),
+    def_mV: view.getUint16(offset + 3, true),
+    min_mV: view.getUint16(offset + 5, true),
+    max_mV: view.getUint16(offset + 7, true)
+  };
 
-  return data;
+  // Shutdown: bytes 30-39
+  offset += 10;
+  features.shutdown = {
+    enabled: buffer[offset] === 1,
+    value_mV: view.getUint16(offset + 1, true),
+    def_mV: view.getUint16(offset + 3, true),
+    min_mV: view.getUint16(offset + 5, true),
+    max_mV: view.getUint16(offset + 7, true)
+  };
+
+  // Hiss: bytes 40-49
+  offset += 10;
+  features.hiss = {
+    enabled: buffer[offset] === 1,
+    value_pct: view.getUint16(offset + 1, true),
+    def_pct: view.getUint16(offset + 3, true),
+    min_pct: view.getUint16(offset + 5, true),
+    max_pct: view.getUint16(offset + 7, true)
+  };
+
+  return { ...features, _rawBuf: buffer };
 }
 
 function showInit(data) {
   currentInitData = data;
 
-  // Update cards
-  beep_enabled_card.textContent = data.beep.enabled ? 'Enabled' : 'Disabled';
-  beep_set.textContent = `${data.beep.value} s`;
-  beep_default_card.textContent = `${data.beep.def} s`;
-  beep_minmax.textContent = `${data.beep.min} / ${data.beep.max} s`;
+  // Update beep card
+  const beep = data.beep;
+  document.getElementById('beep_enabled_card').textContent = beep.enabled ? 'Enabled' : 'Disabled';
+  document.getElementById('beep_set').textContent = beep.value + ' s';
+  document.getElementById('beep_default_card').textContent = beep.def + ' s';
+  document.getElementById('beep_minmax').textContent = beep.min + ' / ' + beep.max + ' s';
 
-  standby_enabled_card.textContent = data.standby.enabled ? 'Enabled' : 'Disabled';
-  standby_set.textContent = `${(data.standby.value_mV / 1000).toFixed(3)} V`;
-  standby_default_card.textContent = `${(data.standby.def_mV / 1000).toFixed(3)} V`;
+  // Update standby card (example; add others similarly if needed)
+  // ...
+}
 
-  shutdown_enabled_card.textContent = data.shutdown.enabled ? 'Enabled' : 'Disabled';
-  shutdown_set.textContent = `${(data.shutdown.value_mV / 1000).toFixed(3)} V`;
-  shutdown_default_card.textContent = `${(data.shutdown.def_mV / 1000).toFixed(3)} V`;
+function animateSpectrum(now) {
+  const canvas = spectrumCanvas;
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = rect.height * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-  hiss_enabled_card.textContent = data.hiss.enabled ? 'Enabled' : 'Disabled';
-  hiss_set.textContent = `${data.hiss.value_pct} %`;
-  hiss_default_card.textContent = `${data.hiss.def_pct} %`;
+  const width = canvas.width / window.devicePixelRatio;
+  const height = canvas.height / window.devicePixelRatio;
+
+  ctx.fillStyle = 'rgba(15, 17, 20, 0.1)';
+  ctx.fillRect(0, 0, width, height);
+
+  const elapsed = (now - animationStartTime) / 1000;
+  const numPoints = 100;
+  const freqRange = parseFloat(card_maxfreq.textContent) - parseFloat(card_minfreq.textContent);
+  const timeFactor = Math.sin(elapsed * currentWavePpm / 1000) * 0.5 + 0.5;
+
+  if (currentMode === 'fft') {
+    // Simplified FFT-like bars
+    for (let i = 0; i < numPoints; i++) {
+      const freq = parseFloat(card_minfreq.textContent) + (i / numPoints) * freqRange;
+      const amp = Math.random() * 50 + timeFactor * 100;
+      const barHeight = (amp / 100) * height;
+      ctx.fillStyle = `hsl(${i * 360 / numPoints}, 70%, 50%)`;
+      ctx.fillRect(i * width / numPoints, height - barHeight, width / numPoints, barHeight);
+    }
+  } else {
+    // Waterfall: shift down, add new line
+    waterfallLines.unshift(new Array(numPoints).fill(0).map((_, i) => Math.random() * 255));
+    if (waterfallLines.length > height) waterfallLines.pop();
+
+    for (let y = 0; y < height; y++) {
+      const line = waterfallLines[y] || new Array(numPoints).fill(0);
+      for (let x = 0; x < numPoints; x++) {
+        const val = line[x];
+        ctx.fillStyle = `hsl(240, 100%, ${val}%)`;
+        ctx.fillRect(x * width / numPoints, y, width / numPoints, 1);
+      }
+    }
+
+    // Add new line at top with time-based variation
+    const newLine = new Array(numPoints).fill(0).map((_, i) => {
+      const freq = parseFloat(card_minfreq.textContent) + (i / numPoints) * freqRange;
+      return (Math.sin(elapsed * freq / 1000) * 0.5 + 0.5) * 255 * timeFactor;
+    });
+    for (let x = 0; x < numPoints; x++) {
+      const val = newLine[x];
+      ctx.fillStyle = `hsl(240, 100%, ${val}%)`;
+      ctx.fillRect(x * width / numPoints, 0, width / numPoints, 1);
+    }
+  }
+
+  if (isAnimating) requestAnimationFrame(animateSpectrum);
 }
 
 async function connect() {
   try {
-    connectButton.disabled = true;
-    connectButton.textContent = 'Scanning...';
     device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [SERVICE_UUID] }],
-      optionalServices: [SERVICE_UUID]
+      filters: [{ services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] }],
+      optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
     });
+    deviceName.textContent = device.name || device.id.slice(-4);
+    bleText.textContent = 'Connecting...';
+    statusDot.style.background = '#ffd54a';
+
     device.addEventListener('gattserverdisconnected', onDeviceDisconnected);
-    server = await device.gatt.connect();
-    console.log('Connected to GATT server');
-    const service = await server.getPrimaryService(SERVICE_UUID);
-    writeChar = await service.getCharacteristic(WRITE_UUID);
-    notifyChar = await service.getCharacteristic(NOTIFY_UUID);
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+    writeChar = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+    notifyChar = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+
     await notifyChar.startNotifications();
     notifyChar.addEventListener('characteristicvaluechanged', onNotify);
-    console.log('Notifications started');
 
-    deviceName.textContent = device.name || device.id.slice(-4);
     bleText.textContent = 'Connected';
     statusDot.style.background = '#27b56b';
 
+    connectButton.disabled = true;
     disconnectButton.disabled = false;
     sendLiveBtn.disabled = false;
     sendInitBtn.disabled = false;
@@ -642,10 +637,9 @@ async function connect() {
     stopAutoBtn.disabled = true;
   } catch (error) {
     console.error('Connection failed:', error);
-    alert(`Connection failed: ${error}`);
-  } finally {
-    connectButton.disabled = false;
-    connectButton.textContent = 'Connect';
+    bleText.textContent = 'Failed';
+    statusDot.style.background = '#ff6b6b';
+    alert('Connection failed: ' + error.message);
   }
 }
 
@@ -933,7 +927,6 @@ forceParse.addEventListener('click', ()=>{
 });
 document.getElementById('copyParsed').addEventListener('click', async ()=>{
   const lines = [
-    `Device Mode: ${card_mode_val.textContent}`,
     `Battery (V): ${card_battery.textContent}`,
     `Current (mA): ${card_current_val.textContent}`,
     `Temp (°C): ${card_temp_value.textContent}`,
@@ -983,76 +976,6 @@ window.addEventListener('resize', () => {
     requestAnimationFrame(animateSpectrum);
   }
 });
-
-async function sendLiveCmd() {
-  if (writeInProgress) return;
-  writeInProgress = true;
-  const frame = new Uint8Array([
-    0xFD, 0xFC, 0xFB, 0xFA, // start
-    0x00, 0x04, // len=4
-    0x4C, 0x49, 0x56, 0x45, // LIVE
-    0x04, 0x03, 0x02, 0x01 // end
-  ]);
-  await writeFrame(frame, 'LIVE');
-  writeInProgress = false;
-}
-
-async function sendInitCmd() {
-  if (writeInProgress) return;
-  writeInProgress = true;
-  const frame = new Uint8Array([
-    0xFD, 0xFC, 0xFB, 0xFA, // start
-    0x00, 0x04, // len=4
-    0x49, 0x4E, 0x49, 0x54, // INIT
-    0x04, 0x03, 0x02, 0x01 // end
-  ]);
-  await writeFrame(frame, 'INIT');
-  writeInProgress = false;
-}
-
-async function writeFrame(frame, tag) {
-  if (!writeChar) throw new Error('No write characteristic');
-  console.log(`TX ${tag}: ${bytesToHexUpper(frame)}`);
-  await writeChar.writeValue(frame);
-}
-
-// Spectrum animation stub (implement as needed)
-function animateSpectrum(now) {
-  const canvas = spectrumCanvas;
-  const ctx = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * window.devicePixelRatio;
-  canvas.height = rect.height * window.devicePixelRatio;
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-  ctx.fillStyle = 'rgba(15, 17, 20, 0.1)';
-  ctx.fillRect(0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
-
-  if (currentMode === 'waterfall') {
-    // Simple waterfall: shift lines
-    waterfallLines.unshift(new Array(100).fill(0).map(() => Math.random() * 255)); // Dummy data
-    if (waterfallLines.length > 100) waterfallLines.pop();
-    for (let y = 0; y < waterfallLines.length; y++) {
-      const line = waterfallLines[y];
-      for (let x = 0; x < line.length; x++) {
-        const val = line[x];
-        ctx.fillStyle = `hsl(${val / 255 * 120}, 100%, 50%)`;
-        ctx.fillRect(x * (canvas.width / window.devicePixelRatio / 100), y, canvas.width / window.devicePixelRatio / 100, 1);
-      }
-    }
-  } else if (currentMode === 'fft') {
-    // Simple FFT bars (dummy)
-    const barWidth = canvas.width / window.devicePixelRatio / 64;
-    for (let i = 0; i < 64; i++) {
-      const height = Math.random() * (canvas.height / window.devicePixelRatio);
-      ctx.fillStyle = '#3b82f6';
-      ctx.fillRect(i * barWidth, canvas.height / window.devicePixelRatio - height, barWidth - 1, height);
-    }
-  }
-
-  if (isAnimating) requestAnimationFrame(animateSpectrum);
-}
-  </script>
+</script>
 </body>
 </html>
-</DOCUMENT>

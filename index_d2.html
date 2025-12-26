@@ -574,7 +574,7 @@ function showLive(obj){
     return;
   }
   card_battery.textContent = (obj.battery_mV != null) ? (obj.battery_mV/1000).toFixed(3) + " V" : "-- V";
-  card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(3) + " mA" : "-- mA";
+  card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(3) + " A" : "-- A";
   card_temp_value.textContent = (obj.temp_raw != null) ? (obj.temp_raw/100).toFixed(2) + " °C" : "-- °C";
   const minHz = obj.min_Hz != null ? Math.max(15000, obj.min_Hz) : 15000;
   const maxHz = obj.max_Hz != null ? Math.min(70000, obj.max_Hz) : 70000;

@@ -520,7 +520,7 @@ function parseLivePacket(bytes){
   const battery_mV = readU16le(buf,10,11);
   const current_mA = (() => {
     const raw = readU16le(buf,12,13);
-    return (raw != null) ? (raw/1000) : null; // stored value /1000 => mA
+    return (raw != null) ? (raw/1e5) : null; // stored value /1000 => mA
   })();
   const temp_raw = readU16le(buf,14,15);
   const min_Hz = readU16le(buf,16,17);

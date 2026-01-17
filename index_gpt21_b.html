@@ -520,7 +520,7 @@ function parseLivePacket(bytes){
   const battery_mV = readU16le(buf,10,11);
   const current_mA = (() => {
     const raw = readU16le(buf,12,13);
-    return (raw != null) ? (raw/1e5) : null; // stored value /1000 => mA
+    return (raw != null) ? (raw/1e2) : null; // stored value /100 => mA
   })();
   const temp_raw = readU16le(buf,14,15);
   const min_Hz = readU16le(buf,16,17);
@@ -560,7 +560,7 @@ function showLive(obj){
   if(!obj || obj.error){
     card_dev_mode_val.textContent = "--";
     card_battery.textContent="-- V";
-    card_current_val.textContent="-- A";
+    card_current_val.textContent="-- mA";
     currentDeviceMode = null;
     isAnimating = false;
     return;
@@ -580,7 +580,7 @@ function showLive(obj){
     }
   }
   card_battery.textContent = (obj.battery_mV != null) ? (obj.battery_mV/1000).toFixed(3) + " V" : "-- V";
-  card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(6) + " A" : "-- A";
+  card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(2) + " mA" : "-- mA";
   card_temp_value.textContent = (obj.temp_raw != null) ? (obj.temp_raw/100).toFixed(2) + " °C" : "-- °C";
   card_minfreq.textContent = (obj.min_Hz != null) ? (obj.min_Hz/1000).toFixed(3) + " kHz" : "-- kHz";
   card_maxfreq.textContent = (obj.max_Hz != null) ? (obj.max_Hz/1000).toFixed(3) + " kHz" : "-- kHz";

@@ -32,6 +32,7 @@
   .metric{display:flex;align-items:center;gap:12px}
   .metric .value{font-size:26px;font-weight:800;color:var(--text)}
   .metric .unit{color:var(--muted);font-size:12px}
+  .secondary-metric{margin-top:4px;color:var(--muted);font-size:13px;font-weight:600}
   .feature-card { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .feature-left {flex:1}
   .feature-title { font-weight:800; color:var(--text) }
@@ -171,6 +172,7 @@
             <div class="value" id="card_current_val">-- mA</div>
             <div class="unit muted">instant</div>
           </div>
+          <div class="secondary-metric" id="card_current_no_ble">Current without Bluetooth: -- mA</div>
           <div class="sub">From LIVE packet (bytes 12-15, uA)</div>
         </div>
         <div class="tile" id="card_temp" style="border-left:6px solid #d6a93e">
@@ -439,6 +441,7 @@ const modeWaterfall = document.getElementById('modeWaterfall');
 const card_dev_mode_val = document.getElementById("card_dev_mode_val");
 const card_battery = document.getElementById("card_battery");
 const card_current_val = document.getElementById("card_current_val");
+const card_current_no_ble = document.getElementById("card_current_no_ble");
 const card_temp_value = document.getElementById("card_temp_value");
 const card_minfreq = document.getElementById("card_minfreq");
 const card_maxfreq = document.getElementById("card_maxfreq");
@@ -516,11 +519,12 @@ function parseLivePacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 28) return { error:"LIVE too short" };
   const payloadLen = readU16le(buf, 4, 5);
-  const isUA32PaddedLive = payloadLen === 37 || buf.length >= 47;
+  const looksLikeUA32Current = buf.length >= 31 && readU16le(buf,14,15) === 0;
+  const isUA32Live = payloadLen >= 25 || buf.length >= 35 || looksLikeUA32Current;
   const battery_mV = readU16le(buf,10,11);
   let current_mA, current_uA, temp_raw, min_Hz, max_Hz, waveVal, pattern, deviceMode, days, hh, mm, ss;
 
-  if(isUA32PaddedLive){
+  if(isUA32Live){
     current_uA = readU32le(buf, 12);
     current_mA = (current_uA != null) ? (current_uA / 1000) : null;
     temp_raw = readU16le(buf,16,17);
@@ -553,7 +557,7 @@ function parseLivePacket(bytes){
   }
   return {
     payloadLen,
-    isUA32PaddedLive,
+    isUA32Live,
     deviceMode, // null for old packets
     battery_mV,
     current_uA,
@@ -584,6 +588,7 @@ function showLive(obj){
     card_dev_mode_val.textContent = "--";
     card_battery.textContent="-- V";
     card_current_val.textContent="-- mA";
+    card_current_no_ble.textContent="Current without Bluetooth: -- mA";
     currentDeviceMode = null;
     isAnimating = false;
     return;
@@ -604,7 +609,8 @@ function showLive(obj){
     }
   }
   card_battery.textContent = (obj.battery_mV != null) ? (obj.battery_mV/1000).toFixed(3) + " V" : "-- V";
-  card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(2) + " mA" : "-- mA";
+  card_current_val.textContent = (obj.current_mA != null) ? obj.current_mA.toFixed(3) + " mA" : "-- mA";
+  card_current_no_ble.textContent = (obj.current_mA != null) ? `Current without Bluetooth: ${Math.max(0, obj.current_mA - 2).toFixed(3)} mA` : "Current without Bluetooth: -- mA";
   card_temp_value.textContent = (obj.temp_raw != null) ? (obj.temp_raw/100).toFixed(2) + " °C" : "-- °C";
   card_minfreq.textContent = (obj.min_Hz != null) ? (obj.min_Hz/1000).toFixed(3) + " kHz" : "-- kHz";
   card_maxfreq.textContent = (obj.max_Hz != null) ? (obj.max_Hz/1000).toFixed(3) + " kHz" : "-- kHz";

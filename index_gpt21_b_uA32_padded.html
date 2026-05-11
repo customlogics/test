@@ -503,9 +503,9 @@ function appendRaw(bytes, label=''){
   const t = new Date().toLocaleTimeString();
   lastPacket = bytes;
   const tag = label ? ` [${label}]` : '';
-  recvRaw.innerHTML += `[${t}]${tag} ${bytesToHexUpper(bytes)}<br>`;
+  recvRaw.innerHTML += `[${t}]${tag} len=${bytes.length} ${bytesToHexUpper(bytes)}<br>`;
   recvRaw.scrollTop = recvRaw.scrollHeight;
-  console.log(`RX${tag}: ${bytesToHexUpper(bytes)}`);
+  console.log(`RX${tag} len=${bytes.length}: ${bytesToHexUpper(bytes)}`);
 }
 function readU8(buf, idx){ return (idx < buf.length) ? buf[idx] : null; }
 function readU16le(buf, lo, hi){ const l=readU8(buf,lo), h=readU8(buf,hi); if(l===null||h===null) return null; return (h<<8) | l; }
@@ -690,7 +690,7 @@ function showInit(obj){
 /* write helper with logging */
 async function writeFrame(bytes, label){
   if(!writeChar) throw new Error("Not connected");
-  console.log("TX " + label + ": " + bytesToHexUpper(bytes));
+  console.log("TX " + label + " len=" + bytes.length + ": " + bytesToHexUpper(bytes));
   try { writeInProgress = true; await writeChar.writeValue(bytes); }
   catch(e){ console.error("Write error:", e); throw e; }
   finally{ writeInProgress = false; }
@@ -895,7 +895,7 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   frame[p++] = sliderRaw & 0xFF;
   frame[p++] = (sliderRaw >> 8) & 0xFF;
   frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
-  console.log(`TX SAVE [${featureKey}] (EN=${enabledNow}) : ${bytesToHexUpper(frame)}`);
+  console.log(`TX SAVE [${featureKey}] (EN=${enabledNow}) len=${frame.length} : ${bytesToHexUpper(frame)}`);
   // write the frame first
   await writeFrame(frame, `SAVE-${featureKey}`);
   // then wait for INIT ack — this will create pendingSave and wait for onNotify to resolve it

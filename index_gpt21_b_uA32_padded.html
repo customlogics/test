@@ -361,6 +361,37 @@
             </div>
           </div>
         </div>
+        <div class="tile" id="feat_log_duration_card" style="border-left:6px solid #3b82f6">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="feature-title">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden>
+                  <rect x="4" y="5" width="16" height="15" rx="2"></rect>
+                  <path d="M8 3v4M16 3v4M4 10h16"></path>
+                </svg>
+                Log duration
+              </div>
+              <div class="feature-sub">Battery graph period</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              <div class="gear" data-feature="log_duration" title="Edit log duration">Edit</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small-muted">Set value</div>
+              <div class="feature-value" id="log_duration_set">-- days</div>
+            </div>
+            <div>
+              <div class="small-muted">Default</div>
+              <div class="small-muted" id="log_duration_default_card">-- days</div>
+            </div>
+            <div>
+              <div class="small-muted">Slider min/max</div>
+              <div class="small-muted" id="log_duration_minmax">-- / -- days</div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="footer">
         <div style="display:flex;gap:12px;align-items:center">
@@ -419,7 +450,8 @@ const CMD_BYTES = {
   beep: [0x42,0x45,0x45,0x50], // "BEEP"
   standby: [0x53,0x54,0x41,0x4E], // "STAN"
   shutdown: [0x53,0x48,0x55,0x54], // "SHUT"
-  hiss: [0x48,0x49,0x53,0x53] // "HISS"
+  hiss: [0x48,0x49,0x53,0x53], // "HISS"
+  log_duration: [0x74,0x50,0x45,0x52] // "tPER"
 };
 /* DOM refs */
 const connectButton = document.getElementById("connectButton");
@@ -466,8 +498,12 @@ const hiss_enabled_card = document.getElementById("hiss_enabled_card");
 const hiss_set = document.getElementById("hiss_set");
 const hiss_default_card = document.getElementById("hiss_default_card");
 const hiss_minmax = document.getElementById("hiss_minmax");
+const log_duration_set = document.getElementById("log_duration_set");
+const log_duration_default_card = document.getElementById("log_duration_default_card");
+const log_duration_minmax = document.getElementById("log_duration_minmax");
 /* modal refs */
 const modalBackdrop = document.getElementById('modalBackdrop');
+const modalToggleRow = document.querySelector('#featureModal .toggle');
 const modalToggle = document.getElementById('modalToggle');
 const modalSlider = document.getElementById('modalSlider');
 const modalSliderValue = document.getElementById('modalSliderValue');
@@ -634,6 +670,7 @@ function showLive(obj){
 function parseInitPacket(bytes){
   const buf = Uint8Array.from(bytes);
   if(buf.length < 51) return { error:"INIT too short" };
+  const declaredLen = readU16le(buf,4,5);
   const beep_en = readU8(buf,11);
   const beep_en_default = readU8(buf,12);
   const beep_val = readU16le(buf,13,14);
@@ -658,11 +695,18 @@ function parseInitPacket(bytes){
   const hiss_minv = readU16le(buf,45,46);
   const hiss_maxv = readU16le(buf,47,48);
   const hiss_defv = readU16le(buf,49,50);
+  const hasLogDuration = buf.length >= 59;
+  const log_duration_setv = hasLogDuration ? readU16le(buf,51,52) : null;
+  const log_duration_minv = hasLogDuration ? readU16le(buf,53,54) : null;
+  const log_duration_maxv = hasLogDuration ? readU16le(buf,55,56) : null;
+  const log_duration_defv = hasLogDuration ? readU16le(buf,57,58) : null;
   return {
     beep:{enabled:beep_en===1,en_default:beep_en_default===1,value:beep_val,min:beep_min,max:beep_max,def:beep_def},
     standby:{enabled:standby_en===1,en_default:standby_en_default===1,value_mV:standby_val,min_mV:standby_minv,max_mV:standby_maxv,def_mV:standby_defv},
     shutdown:{enabled:shutdown_en===1,en_default:shutdown_en_default===1,value_mV:shutdown_val,min_mV:shutdown_minv,max_mV:shutdown_maxv,def_mV:shutdown_defv},
     hiss:{enabled:hiss_en===1,en_default:hiss_en_default===1,value_pct:hiss_val,min_pct:hiss_minv,max_pct:hiss_maxv,def_pct:hiss_defv},
+    log_duration:{value_days:log_duration_setv,min_days:log_duration_minv,max_days:log_duration_maxv,def_days:log_duration_defv},
+    payloadLen: declaredLen,
     rawHex: bytesToHexUpper(buf), _rawBuf: buf
   };
 }
@@ -685,6 +729,9 @@ function showInit(obj){
   hiss_set.textContent = (obj.hiss.value_pct!=null) ? `${obj.hiss.value_pct} %` : "-- %";
   hiss_default_card.textContent = (obj.hiss.def_pct!=null) ? `${obj.hiss.def_pct} %` : "-- %";
   hiss_minmax.textContent = `${obj.hiss.min_pct ?? "--"} / ${obj.hiss.max_pct ?? "--"} %`;
+  log_duration_set.textContent = (obj.log_duration.value_days!=null) ? `${obj.log_duration.value_days} days` : "-- days";
+  log_duration_default_card.textContent = (obj.log_duration.def_days!=null) ? `${obj.log_duration.def_days} days` : "-- days";
+  log_duration_minmax.textContent = `${obj.log_duration.min_days ?? "--"} / ${obj.log_duration.max_days ?? "--"} days`;
   console.log("INIT parsed & UI updated");
 }
 /* write helper with logging */
@@ -886,6 +933,19 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   if(writeInProgress) throw new Error("Write in progress");
   const cmd = CMD_BYTES[featureKey];
   if(!cmd) throw new Error("Unknown feature cmd");
+  if(featureKey === 'log_duration'){
+    const frame = new Uint8Array(4 + 2 + 4 + 2 + 4);
+    let p = 0;
+    frame[p++] = 0xFD; frame[p++] = 0xFC; frame[p++] = 0xFB; frame[p++] = 0xFA;
+    frame[p++] = 0x06; frame[p++] = 0x00;
+    frame[p++] = cmd[0]; frame[p++] = cmd[1]; frame[p++] = cmd[2]; frame[p++] = cmd[3];
+    frame[p++] = sliderRaw & 0xFF;
+    frame[p++] = (sliderRaw >> 8) & 0xFF;
+    frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
+    console.log(`TX SAVE [${featureKey}] len=${frame.length} : ${bytesToHexUpper(frame)}`);
+    await writeFrame(frame, `SAVE-${featureKey}`);
+    return waitForInitAck(featureKey, sliderRaw, 5000);
+  }
   const frame = new Uint8Array(4 + 2 + 4 + 1 + 2 + 4);
   let p = 0;
   frame[p++] = 0xFD; frame[p++] = 0xFC; frame[p++] = 0xFB; frame[p++] = 0xFA;
@@ -905,13 +965,19 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
 function updateModalSliderValueDisplaySeconds(){ modalSliderValue.textContent = modalSlider.value + " s"; }
 function updateModalSliderValueDisplayVolts(){ modalSliderValue.textContent = (modalSlider.value/1000).toFixed(3) + " V"; }
 function updateModalSliderValueDisplayPercent(){ modalSliderValue.textContent = modalSlider.value + " %"; }
+function updateModalSliderValueDisplayDays(){ modalSliderValue.textContent = modalSlider.value + " days"; }
 function openFeatureModal(featureKey){
   if(!currentInitData) return alert("No INIT data available yet. Send INIT to populate.");
   const data = currentInitData[featureKey];
   if(!data) return alert("Feature data missing");
   editingFeature = featureKey;
-  modalTitle.textContent = ({beep:"Audible beep", standby:"Standby mode", shutdown:"Shutdown mode", hiss:"Audible Hiss band"})[featureKey] || "Edit Feature";
-  if(data.enabled) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+  modalTitle.textContent = ({beep:"Audible beep", standby:"Standby mode", shutdown:"Shutdown mode", hiss:"Audible Hiss band", log_duration:"Log duration"})[featureKey] || "Edit Feature";
+  if(featureKey === 'log_duration'){
+    modalToggleRow.style.display = 'none';
+  } else {
+    modalToggleRow.style.display = 'flex';
+    if(data.enabled) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+  }
   if(featureKey === 'beep'){
     modalSlider.min = data.min ?? 0; modalSlider.max = data.max ?? Math.max((data.min||0)+1, data.value||0);
     modalSlider.step = 1; modalSlider.value = data.value ?? data.def ?? modalSlider.min;
@@ -931,6 +997,12 @@ function openFeatureModal(featureKey){
     sliderLabel.textContent = "Play frequency (band %)";
     sliderMinLabel.textContent = modalSlider.min + " %"; sliderMaxLabel.textContent = modalSlider.max + " %";
     updateModalSliderValueDisplayPercent();
+  } else if(featureKey === 'log_duration'){
+    modalSlider.min = data.min_days ?? 1; modalSlider.max = data.max_days ?? Math.max((data.min_days||1)+1, data.value_days||1);
+    modalSlider.step = 1; modalSlider.value = data.value_days ?? data.def_days ?? modalSlider.min;
+    sliderLabel.textContent = "Log duration";
+    sliderMinLabel.textContent = modalSlider.min + " days"; sliderMaxLabel.textContent = modalSlider.max + " days";
+    updateModalSliderValueDisplayDays();
   }
   modalBackdrop.style.display = 'flex';
 }
@@ -940,15 +1012,19 @@ modalSlider.addEventListener('input', ()=>{
   if(editingFeature === 'beep') updateModalSliderValueDisplaySeconds();
   else if(editingFeature === 'standby' || editingFeature === 'shutdown') updateModalSliderValueDisplayVolts();
   else if(editingFeature === 'hiss') updateModalSliderValueDisplayPercent();
+  else if(editingFeature === 'log_duration') updateModalSliderValueDisplayDays();
 });
 modalReset.addEventListener('click', ()=>{
   if(!editingFeature || !currentInitData) return;
   const d = currentInitData[editingFeature];
   if(!d) return;
-  if(d.en_default) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+  if(editingFeature !== 'log_duration'){
+    if(d.en_default) modalToggle.classList.add('on'); else modalToggle.classList.remove('on');
+  }
   if(editingFeature === 'beep'){ modalSlider.value = (d.def!=null)?d.def:(d.value!=null?d.value:modalSlider.min); updateModalSliderValueDisplaySeconds(); }
   else if(editingFeature === 'standby' || editingFeature === 'shutdown'){ modalSlider.value = (d.def_mV!=null)?d.def_mV:(d.value_mV!=null?d.value_mV:modalSlider.min); updateModalSliderValueDisplayVolts(); }
   else if(editingFeature === 'hiss'){ modalSlider.value = (d.def_pct!=null)?d.def_pct:(d.value_pct!=null?d.value_pct:modalSlider.min); updateModalSliderValueDisplayPercent(); }
+  else if(editingFeature === 'log_duration'){ modalSlider.value = (d.def_days!=null)?d.def_days:(d.value_days!=null?d.value_days:modalSlider.min); updateModalSliderValueDisplayDays(); }
 });
 modalClose.addEventListener('click', closeModal);
 modalBackdrop.addEventListener('click', (ev)=>{ if(ev.target === modalBackdrop) closeModal(); });
@@ -957,7 +1033,7 @@ modalSave.addEventListener('click', async ()=>{
   if(!editingFeature || !currentInitData){ closeModal(); return; }
   if(!writeChar) { alert("Not connected — can't send save command"); return; }
   if(writeInProgress) { alert("Write in progress — try again"); return; }
-  const enabledNow = modalToggle.classList.contains('on') ? 1 : 0;
+  const enabledNow = editingFeature === 'log_duration' ? 1 : (modalToggle.classList.contains('on') ? 1 : 0);
   const sliderRaw = parseInt(modalSlider.value,10);
   modalSave.disabled = true; const prevText = modalSave.textContent; modalSave.textContent = "Saving...";
   try{
@@ -967,6 +1043,7 @@ modalSave.addEventListener('click', async ()=>{
     else if(editingFeature === 'standby'){ currentInitData.standby.enabled = enabledNow===1; currentInitData.standby.value_mV = sliderRaw; }
     else if(editingFeature === 'shutdown'){ currentInitData.shutdown.enabled = enabledNow===1; currentInitData.shutdown.value_mV = sliderRaw; }
     else if(editingFeature === 'hiss'){ currentInitData.hiss.enabled = enabledNow===1; currentInitData.hiss.value_pct = sliderRaw; }
+    else if(editingFeature === 'log_duration'){ currentInitData.log_duration.value_days = sliderRaw; }
     showInit(currentInitData);
     closeModal();
     alert("Save acknowledged (INIT byte10=1).");

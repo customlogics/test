@@ -63,6 +63,18 @@
   .radio-group input[type="radio"] { accent-color: var(--accent-2); }
   .radio-group label { color: var(--muted); font-size: 12px; cursor: pointer; user-select: none; }
   canvas#spectrumCanvas { width:100%; height:160px; border-radius:8px; display:block; margin-top:8px; background:transparent; }
+  .battery-chart-stack{display:grid;grid-template-columns:1fr;gap:14px;margin-top:12px}
+  .battery-chart-title{font-size:13px;font-weight:800;color:var(--text);margin-bottom:6px}
+  canvas.batteryLogCanvas { width:100%; height:260px; border-radius:8px; display:block; background:rgba(255,255,255,0.02); }
+  .view-panel{min-width:0}
+  .page-tabs{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .page-tabs .active{border-color:rgba(59,130,246,0.75);color:#d7ecff;background:rgba(59,130,246,0.12)}
+  .battery-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .log-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+  .log-stat{background:var(--glass);border-radius:10px;padding:10px;border:1px solid rgba(255,255,255,0.04)}
+  .log-stat .label{font-size:12px;color:var(--muted)}
+  .log-stat .val{font-size:18px;font-weight:800;margin-top:4px;color:var(--text)}
+  @media (max-width:980px){.log-stat-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -105,15 +117,20 @@
           </div>
           <div>
             <button id="openSetup" class="btn-ghost">Setup</button>
+            <button id="openBatteryMonitor" class="btn-ghost">Battery Monitor</button>
           </div>
         </div>
       </div>
     </div>
     <!-- RIGHT -->
-    <div>
+    <div class="view-panel" id="dashboardPage">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="font-size:18px;font-weight:800; color:var(--text)">Dashboard</div>
-        <div class="muted">Auto: <span id="autoStatus">Idle</span></div>
+        <div class="page-tabs">
+          <button id="dashboardTab" class="btn-ghost active">Dashboard</button>
+          <button id="batteryTab" class="btn-ghost">Battery Monitor</button>
+          <div class="muted">Auto: <span id="autoStatus">Idle</span></div>
+        </div>
       </div>
       <div class="grid">
         <!-- Spectrum tile moved here (from original position after wave card) -->
@@ -404,6 +421,61 @@
         </div>
       </div>
     </div>
+    <div class="view-panel" id="batteryPage" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:18px;font-weight:800;color:var(--text)">Battery Monitor</div>
+        <div class="page-tabs">
+          <button id="batteryBackDashboard" class="btn-ghost">Dashboard</button>
+          <button id="refreshBatteryLogs" class="connectBtn">Refresh logs</button>
+        </div>
+      </div>
+      <div class="tile" style="border-left:6px solid #27b56b">
+        <div class="battery-toolbar">
+          <div class="badge" id="batteryLogStatus">Idle</div>
+          <div class="muted" id="batteryLogHint">Open while connected to request vLOG and cLOG chunks.</div>
+        </div>
+        <div class="battery-chart-stack">
+          <div>
+            <div class="battery-chart-title">Voltage log</div>
+            <canvas id="batteryVoltageCanvas" class="batteryLogCanvas"></canvas>
+          </div>
+          <div>
+            <div class="battery-chart-title">Current log</div>
+            <canvas id="batteryCurrentCanvas" class="batteryLogCanvas"></canvas>
+          </div>
+          <div>
+            <div class="battery-chart-title">Instantaneous power</div>
+            <canvas id="batteryPowerCanvas" class="batteryLogCanvas"></canvas>
+          </div>
+        </div>
+        <div class="log-stat-grid">
+          <div class="log-stat">
+            <div class="label">Voltage points</div>
+            <div class="val" id="vLogPointCount">--</div>
+          </div>
+          <div class="log-stat">
+            <div class="label">Current points</div>
+            <div class="val" id="cLogPointCount">--</div>
+          </div>
+          <div class="log-stat">
+            <div class="label">Current pointer</div>
+            <div class="val" id="logCurrentPtr">--</div>
+          </div>
+          <div class="log-stat">
+            <div class="label">Cycle number</div>
+            <div class="val" id="logCycleNum">--</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div class="muted" id="batteryLogProgress">No log request active</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="copyBatteryLogs" class="btn-ghost">Copy logs JSON</button>
+        </div>
+      </div>
+    </div>
   </div>
   <!-- Modal -->
   <div class="modal-backdrop" id="modalBackdrop">
@@ -453,6 +525,10 @@ const CMD_BYTES = {
   hiss: [0x48,0x49,0x53,0x53], // "HISS"
   log_duration: [0x74,0x50,0x45,0x52] // "tPER"
 };
+const LOG_CMD_BYTES = {
+  vLOG: [0x76,0x4C,0x4F,0x47],
+  cLOG: [0x63,0x4C,0x4F,0x47]
+};
 /* DOM refs */
 const connectButton = document.getElementById("connectButton");
 const disconnectButton = document.getElementById("disconnectButton");
@@ -469,6 +545,24 @@ const statusDot = document.getElementById("statusDot");
 const autoStatus = document.getElementById("autoStatus");
 const modeFft = document.getElementById('modeFft');
 const modeWaterfall = document.getElementById('modeWaterfall');
+const dashboardPage = document.getElementById('dashboardPage');
+const batteryPage = document.getElementById('batteryPage');
+const dashboardTab = document.getElementById('dashboardTab');
+const batteryTab = document.getElementById('batteryTab');
+const openBatteryMonitor = document.getElementById('openBatteryMonitor');
+const batteryBackDashboard = document.getElementById('batteryBackDashboard');
+const refreshBatteryLogs = document.getElementById('refreshBatteryLogs');
+const batteryLogStatus = document.getElementById('batteryLogStatus');
+const batteryLogHint = document.getElementById('batteryLogHint');
+const batteryLogProgress = document.getElementById('batteryLogProgress');
+const batteryVoltageCanvas = document.getElementById('batteryVoltageCanvas');
+const batteryCurrentCanvas = document.getElementById('batteryCurrentCanvas');
+const batteryPowerCanvas = document.getElementById('batteryPowerCanvas');
+const vLogPointCount = document.getElementById('vLogPointCount');
+const cLogPointCount = document.getElementById('cLogPointCount');
+const logCurrentPtr = document.getElementById('logCurrentPtr');
+const logCycleNum = document.getElementById('logCycleNum');
+const copyBatteryLogs = document.getElementById('copyBatteryLogs');
 /* LIVE card elements */
 const card_dev_mode_val = document.getElementById("card_dev_mode_val");
 const card_battery = document.getElementById("card_battery");
@@ -522,6 +616,11 @@ let lastLiveParsed = null;
 let autoIntervalId = null;
 let writeInProgress = false;
 let editingFeature = null;
+let activePage = 'dashboard';
+let batteryLogData = null;
+let batteryLogFetchRunning = false;
+let logRxBuffer = new Uint8Array(0);
+let awaitingLogChunk = null;
 /* pendingSave & awaitingInitPromise */
 let pendingSave = null;
 let awaitingInitPromise = null;
@@ -534,6 +633,9 @@ function hexToBytes(hexStr){
 }
 function bytesToHexUpper(bytes){
   return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+}
+function dataViewToBytes(view){
+  return new Uint8Array(view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength));
 }
 function appendRaw(bytes, label=''){
   const t = new Date().toLocaleTimeString();
@@ -744,6 +846,207 @@ async function writeFrame(bytes, label){
 }
 async function sendLiveCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(LIVE_CMD_HEX); await writeFrame(d, "LIVE"); }
 async function sendInitCmd(){ if(writeInProgress) return console.warn("Write in progress"); const d = hexToBytes(INIT_CMD_HEX); await writeFrame(d, "INIT"); }
+function concatBytes(a, b){
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+}
+function isLogTagAt(buf, offset){
+  return isTagAt(buf, offset, "vLOG") || isTagAt(buf, offset, "cLOG");
+}
+function findFrameEnd(buf, fromIndex = 0){
+  for(let i = Math.max(0, fromIndex); i <= buf.length - 4; i++){
+    if(buf[i] === 0x04 && buf[i+1] === 0x03 && buf[i+2] === 0x02 && buf[i+3] === 0x01) return i;
+  }
+  return -1;
+}
+function buildLogRequestFrame(kind, chunkNumber){
+  const cmd = LOG_CMD_BYTES[kind];
+  if(!cmd) throw new Error("Unknown log command");
+  const frame = new Uint8Array(15);
+  let p = 0;
+  frame[p++] = 0xFD; frame[p++] = 0xFC; frame[p++] = 0xFB; frame[p++] = 0xFA;
+  frame[p++] = 0x05; frame[p++] = 0x00;
+  frame[p++] = cmd[0]; frame[p++] = cmd[1]; frame[p++] = cmd[2]; frame[p++] = cmd[3];
+  frame[p++] = chunkNumber & 0xFF;
+  frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
+  return frame;
+}
+async function sendLogChunkRequest(kind, chunkNumber){
+  const frame = buildLogRequestFrame(kind, chunkNumber);
+  await writeFrame(frame, `${kind}-${chunkNumber}`);
+}
+function parseBatteryLogFrame(bytes){
+  const buf = Uint8Array.from(bytes);
+  const payloadLen = readU16le(buf, 4, 5);
+  const kind = isTagAt(buf, 6, "vLOG") ? "vLOG" : (isTagAt(buf, 6, "cLOG") ? "cLOG" : null);
+  if(!kind) return { error:"Not a vLOG/cLOG frame" };
+  const frameEnd = findFrameEnd(buf, 17);
+  if(frameEnd < 0) return { error:"Missing log frame end" };
+  const totalChunks = readU8(buf, 10);
+  const currentChunk = readU8(buf, 11);
+  const chunkPoints = readU16le(buf, 12, 13);
+  const currentPtr = readU16le(buf, 14, 15);
+  const cycleNum = readU8(buf, 16);
+  const dataStart = 17;
+  const dataEnd = frameEnd;
+  if(chunkPoints == null || dataEnd < dataStart) return { error:"Bad chunk length" };
+  const dataBytes = buf.slice(dataStart, dataEnd);
+  if(dataBytes.length < chunkPoints * 2){
+    return { error:`Incomplete chunk data: got ${dataBytes.length} bytes for ${chunkPoints} uint16 points` };
+  }
+  const rawPoints = [];
+  for(let i=0; i + 1 < dataBytes.length && rawPoints.length < chunkPoints; i += 2){
+    rawPoints.push(dataBytes[i] | (dataBytes[i + 1] << 8));
+  }
+  return {
+    kind,
+    payloadLen,
+    totalChunks,
+    currentChunk,
+    chunkLen: chunkPoints,
+    dataByteLen: dataBytes.length,
+    currentPtr,
+    cycleNum,
+    rawPoints,
+    rawHex: bytesToHexUpper(buf)
+  };
+}
+function waitForLogChunk(kind, chunkNumber, timeoutMs = 6000){
+  if(awaitingLogChunk) throw new Error("Log chunk wait already active");
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const bufferedHex = logRxBuffer.length ? bytesToHexUpper(logRxBuffer) : "(empty)";
+      awaitingLogChunk = null;
+      reject(new Error(`${kind} chunk ${chunkNumber} timeout; buffered ${logRxBuffer.length} bytes: ${bufferedHex}`));
+    }, timeoutMs);
+    awaitingLogChunk = {
+      kind,
+      chunkNumber,
+      resolve: (frame) => { clearTimeout(timer); awaitingLogChunk = null; resolve(frame); },
+      reject: (err) => { clearTimeout(timer); awaitingLogChunk = null; reject(err); }
+    };
+  });
+}
+function handleLogFrame(frameBytes){
+  appendRaw(frameBytes, isTagAt(frameBytes, 6, "vLOG") ? "vLOG" : "cLOG");
+  const parsed = parseBatteryLogFrame(frameBytes);
+  if(parsed.error){
+    console.warn("Log parse error:", parsed.error);
+    return;
+  }
+  if(awaitingLogChunk && awaitingLogChunk.kind === parsed.kind && awaitingLogChunk.chunkNumber === parsed.currentChunk){
+    awaitingLogChunk.resolve(parsed);
+  } else {
+    console.log("Unsolicited log chunk:", parsed);
+  }
+}
+function processLogRxBytes(bytes){
+  console.log(`RX LOG FRAG len=${bytes.length}: ${bytesToHexUpper(bytes)}`);
+  appendRaw(bytes, 'LOG FRAG');
+  logRxBuffer = concatBytes(logRxBuffer, bytes);
+  console.log(`LOG RX buffer len=${logRxBuffer.length}: ${bytesToHexUpper(logRxBuffer)}`);
+  let handled = false;
+  while(logRxBuffer.length >= 10){
+    let start = -1;
+    for(let i=0; i <= logRxBuffer.length - 10; i++){
+      if(logRxBuffer[i] === 0xFD && logRxBuffer[i+1] === 0xFC && logRxBuffer[i+2] === 0xFB && logRxBuffer[i+3] === 0xFA){
+        start = i;
+        break;
+      }
+    }
+    if(start < 0){
+      console.warn(`LOG RX dropping ${logRxBuffer.length} bytes without frame start: ${bytesToHexUpper(logRxBuffer)}`);
+      logRxBuffer = new Uint8Array(0);
+      return true;
+    }
+    if(start > 0) logRxBuffer = logRxBuffer.slice(start);
+    if(logRxBuffer.length < 10) return true;
+    if(!isLogTagAt(logRxBuffer, 6)){
+      console.warn(`LOG RX frame start found but tag is not vLOG/cLOG; tag bytes=${bytesToHexUpper(logRxBuffer.slice(6, Math.min(10, logRxBuffer.length)))}`);
+      if(awaitingLogChunk) return handled;
+      logRxBuffer = new Uint8Array(0);
+      return handled;
+    }
+    const payloadLen = readU16le(logRxBuffer, 4, 5);
+    const frameEnd = findFrameEnd(logRxBuffer, 17);
+    console.log(`LOG RX candidate tag=${String.fromCharCode(...logRxBuffer.slice(6,10))} payloadLen=${payloadLen} frameEnd=${frameEnd} buffered=${logRxBuffer.length}`);
+    if(frameEnd < 0) return true;
+    const frameLen = frameEnd + 4;
+    const frame = logRxBuffer.slice(0, frameLen);
+    logRxBuffer = logRxBuffer.slice(frameLen);
+    handled = true;
+    handleLogFrame(frame);
+  }
+  return handled;
+}
+function setBatteryLogStatus(text, detail){
+  batteryLogStatus.textContent = text;
+  if(detail !== undefined) batteryLogProgress.textContent = detail;
+}
+function reorderCircularPoints(points, currentPtr, cycleNum){
+  if(!Array.isArray(points) || points.length === 0) return [];
+  if(!(cycleNum > 0) || currentPtr == null || currentPtr < 0 || currentPtr >= points.length) return points.slice();
+  return points.slice(currentPtr + 1).concat(points.slice(0, currentPtr + 1));
+}
+async function fetchLogKind(kind){
+  const chunks = [];
+  let totalChunks = null;
+  let currentPtr = null;
+  let cycleNum = null;
+  for(let chunkNumber = 1; totalChunks == null || chunkNumber <= totalChunks; chunkNumber++){
+    setBatteryLogStatus("Loading", `${kind}: requesting chunk ${chunkNumber}${totalChunks ? ` / ${totalChunks}` : ""}`);
+    const wait = waitForLogChunk(kind, chunkNumber);
+    await sendLogChunkRequest(kind, chunkNumber);
+    const parsed = await wait;
+    totalChunks = parsed.totalChunks || 1;
+    currentPtr = parsed.currentPtr;
+    cycleNum = parsed.cycleNum;
+    chunks[parsed.currentChunk - 1] = parsed.rawPoints;
+  }
+  const rawPoints = chunks.flat();
+  const orderedRaw = reorderCircularPoints(rawPoints, currentPtr, cycleNum);
+  const values = orderedRaw.map(v => kind === "vLOG" ? v / 1000 : v / 100);
+  return { kind, rawPoints, orderedRaw, values, totalChunks, currentPtr, cycleNum };
+}
+async function requestBatteryLogs(){
+  if(!writeChar){
+    setBatteryLogStatus("Not connected", "Connect to CARCAT before requesting logs.");
+    alert("Not connected. Connect to CARCAT before requesting logs.");
+    return;
+  }
+  if(batteryLogFetchRunning) return;
+  batteryLogFetchRunning = true;
+  refreshBatteryLogs.disabled = true;
+  if(autoIntervalId) stopAutoLive();
+  logRxBuffer = new Uint8Array(0);
+  batteryLogData = null;
+  vLogPointCount.textContent = "--";
+  cLogPointCount.textContent = "--";
+  logCurrentPtr.textContent = "--";
+  logCycleNum.textContent = "--";
+  drawBatteryLogChart();
+  try{
+    batteryLogHint.textContent = "Fetching voltage and current log chunks over BLE.";
+    const vLog = await fetchLogKind("vLOG");
+    const cLog = await fetchLogKind("cLOG");
+    batteryLogData = { vLog, cLog, fetchedAt: new Date().toISOString() };
+    vLogPointCount.textContent = vLog.values.length.toString();
+    cLogPointCount.textContent = cLog.values.length.toString();
+    logCurrentPtr.textContent = `${vLog.currentPtr ?? cLog.currentPtr ?? "--"}`;
+    logCycleNum.textContent = `${vLog.cycleNum ?? cLog.cycleNum ?? "--"}`;
+    setBatteryLogStatus("Ready", `Loaded ${vLog.values.length} voltage points and ${cLog.values.length} current points.`);
+    drawBatteryLogChart();
+  }catch(e){
+    console.error("Battery log fetch failed:", e);
+    setBatteryLogStatus("Error", e.message || String(e));
+    alert("Battery log fetch failed: " + (e.message || e));
+  }finally{
+    batteryLogFetchRunning = false;
+    refreshBatteryLogs.disabled = false;
+  }
+}
 /* Robust connect/disconnect (original preserved exactly) */
 async function connect() {
   console.log("Connect button clicked");
@@ -845,7 +1148,10 @@ async function disconnect() {
 }
 /* Notification handler (original) */
 function onNotify(ev){
-  const arr = new Uint8Array(ev.target.value.buffer);
+  const arr = dataViewToBytes(ev.target.value);
+  if((awaitingLogChunk || isLogTagAt(arr, 6)) && processLogRxBytes(arr)){
+    return;
+  }
   if (isTagAt(arr, 6, "LIVE") && arr.length >= 28) {
     appendRaw(arr, 'LIVE');
     const liveParsed = parseLivePacket(arr);
@@ -1072,11 +1378,122 @@ document.querySelectorAll('.gear').forEach(g => {
     }
   });
 });
+function showPage(page){
+  activePage = page;
+  const showingBattery = page === 'battery';
+  dashboardPage.style.display = showingBattery ? 'none' : 'block';
+  batteryPage.style.display = showingBattery ? 'block' : 'none';
+  dashboardTab.classList.toggle('active', !showingBattery);
+  batteryTab.classList.toggle('active', showingBattery);
+  if(showingBattery){
+    requestAnimationFrame(drawBatteryLogChart);
+    if(writeChar && !batteryLogData && !batteryLogFetchRunning) requestBatteryLogs();
+    else if(!writeChar) setBatteryLogStatus("Not connected", "Connect to CARCAT, then refresh logs.");
+  }
+}
+function drawBatteryLogChart(){
+  const voltageValues = batteryLogData?.vLog?.values || [];
+  const currentValues = batteryLogData?.cLog?.values || [];
+  const powerValues = derivePowerValues(voltageValues, currentValues);
+  drawSingleBatteryChart(batteryVoltageCanvas, voltageValues, {
+    color: '#27b56b',
+    label: 'Voltage',
+    unit: 'V',
+    emptyText: 'No voltage log data loaded',
+    zeroMin: true
+  });
+  drawSingleBatteryChart(batteryCurrentCanvas, currentValues, {
+    color: '#ffcc00',
+    label: 'Current',
+    unit: 'mA',
+    emptyText: 'No current log data loaded'
+  });
+  drawSingleBatteryChart(batteryPowerCanvas, powerValues, {
+    color: '#66d9ef',
+    label: 'Power',
+    unit: 'mW',
+    emptyText: 'Load voltage and current logs to derive power',
+    zeroMin: true
+  });
+}
+function derivePowerValues(voltageValues, currentValues){
+  const count = Math.min(voltageValues.length, currentValues.length);
+  const out = [];
+  for(let i=0; i<count; i++){
+    out.push(voltageValues[i] * currentValues[i]);
+  }
+  return out;
+}
+function drawSingleBatteryChart(canvas, values, opts){
+  if(!canvas) return;
+  const ctx = setupCanvas(canvas);
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.width / dpr;
+  const height = canvas.height / dpr;
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = 'rgba(255,255,255,0.02)';
+  ctx.fillRect(0, 0, width, height);
+  const left = 58, right = 24, top = 22, bottom = 42;
+  const plotW = Math.max(1, width - left - right);
+  const plotH = Math.max(1, height - top - bottom);
+  ctx.strokeStyle = 'rgba(160,200,220,0.22)';
+  ctx.lineWidth = 1;
+  ctx.font = '12px Inter, Arial';
+  ctx.fillStyle = 'rgba(180,220,235,0.92)';
+  for(let i=0; i<=4; i++){
+    const y = top + (plotH * i / 4);
+    ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + plotW, y); ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left, top + plotH);
+  ctx.lineTo(left + plotW, top + plotH);
+  ctx.lineTo(left + plotW, top);
+  ctx.stroke();
+  if(!values.length){
+    ctx.fillStyle = 'rgba(180,220,235,0.72)';
+    ctx.textAlign = 'center';
+    ctx.fillText(opts.emptyText, width / 2, height / 2);
+    return;
+  }
+  let min = Math.min(...values), max = Math.max(...values);
+  const pad = Math.max((max - min) * 0.08, opts.unit === 'V' ? 0.005 : 0.1);
+  min = opts.zeroMin ? 0 : (min - pad);
+  max += pad;
+  if(min === max){ min -= 1; max += 1; }
+  const range = {min, max};
+  const count = Math.max(values.length, 1);
+  const xFor = (i) => left + (count <= 1 ? 0 : (i / (count - 1)) * plotW);
+  const yFor = (value) => top + plotH - ((value - range.min) / (range.max - range.min)) * plotH;
+  ctx.beginPath();
+  values.forEach((value, i) => {
+    const x = xFor(i), y = yFor(value);
+    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = opts.color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.fillStyle = opts.color;
+  ctx.fillText(`${opts.label} ${Math.min(...values).toFixed(3)}-${Math.max(...values).toFixed(3)} ${opts.unit}`, left, 16);
+  ctx.fillStyle = 'rgba(180,220,235,0.72)';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${range.max.toFixed(3)}`, left - 8, top + 4);
+  ctx.fillText(`${range.min.toFixed(3)}`, left - 8, top + plotH);
+  ctx.fillStyle = 'rgba(180,220,235,0.92)';
+  ctx.textAlign = 'center';
+  ctx.fillText('Samples oldest to newest', left + plotW / 2, height - 10);
+}
 /* UI wiring for other controls */
 connectButton.addEventListener('click', connect);
 disconnectButton.addEventListener('click', disconnect);
 sendLiveBtn.addEventListener('click', sendLiveCmd);
 sendInitBtn.addEventListener('click', sendInitCmd);
+dashboardTab.addEventListener('click', ()=> showPage('dashboard'));
+batteryTab.addEventListener('click', ()=> showPage('battery'));
+openBatteryMonitor.addEventListener('click', ()=> showPage('battery'));
+batteryBackDashboard.addEventListener('click', ()=> showPage('dashboard'));
+refreshBatteryLogs.addEventListener('click', requestBatteryLogs);
 startAutoBtn.addEventListener('click', startAutoLive);
 stopAutoBtn.addEventListener('click', stopAutoLive);
 clearRaw.addEventListener('click', ()=> recvRaw.innerHTML = '');
@@ -1101,6 +1518,11 @@ document.getElementById('copyParsed').addEventListener('click', async ()=>{
   await navigator.clipboard.writeText(lines); alert("LIVE parsed copied");
 });
 document.getElementById('copyInit').addEventListener('click', async ()=>{ if(!currentInitData) return alert("No INIT"); await navigator.clipboard.writeText(JSON.stringify(currentInitData,null,2)); alert("INIT copied"); });
+copyBatteryLogs.addEventListener('click', async ()=>{
+  if(!batteryLogData) return alert("No battery logs loaded");
+  await navigator.clipboard.writeText(JSON.stringify(batteryLogData, null, 2));
+  alert("Battery logs copied");
+});
 /* initial checks */
 if(!navigator.bluetooth){
   alert("Web Bluetooth not available in this browser.");

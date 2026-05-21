@@ -90,6 +90,7 @@
           <div style="text-align:right">
             <div class="muted">Connected to:</div>
             <div id="deviceName" class="badge">Not connected</div>
+            <div id="rssiText" class="muted" style="margin-top:6px;font-size:12px">RSSI: -- dBm</div>
           </div>
         </div>
         <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
@@ -540,6 +541,7 @@ const recvRaw = document.getElementById("recvRaw");
 const clearRaw = document.getElementById("clearRaw");
 const forceParse = document.getElementById("forceParse");
 const deviceName = document.getElementById("deviceName");
+const rssiText = document.getElementById("rssiText");
 const bleText = document.getElementById("bleText");
 const statusDot = document.getElementById("statusDot");
 const autoStatus = document.getElementById("autoStatus");
@@ -624,6 +626,85 @@ let awaitingLogChunk = null;
 /* pendingSave & awaitingInitPromise */
 let pendingSave = null;
 let awaitingInitPromise = null;
+/* Compact Web Bluetooth debug trace */
+const bleDebugTrace = [];
+window.bleDebugTrace = bleDebugTrace;
+const bleDebugStartedAt = performance.now();
+let bleDebugSeq = 0;
+function bleDebug(label, detail){
+  const t = (performance.now() - bleDebugStartedAt).toFixed(1);
+  const entry = {
+    seq: ++bleDebugSeq,
+    t_ms: Number(t),
+    label,
+    detail: detail ?? null,
+    gattConnected: !!(device && device.gatt && device.gatt.connected),
+    deviceName: device ? (device.name || null) : null,
+    deviceId: device ? device.id : null
+  };
+  bleDebugTrace.push(entry);
+  if(bleDebugTrace.length > 250) bleDebugTrace.shift();
+  if(detail !== undefined && detail !== null){
+    console.info(`[BLE ${entry.seq} +${t}ms] ${label}`, detail);
+  } else {
+    console.info(`[BLE ${entry.seq} +${t}ms] ${label}`);
+  }
+  return entry;
+}
+function bleErrorDetail(err){
+  if(!err) return { message: "unknown error" };
+  return {
+    name: err.name || null,
+    message: err.message || String(err),
+    code: err.code ?? null,
+    stack: err.stack || null
+  };
+}
+async function bleStep(label, fn){
+  bleDebug(`${label}: begin`);
+  try{
+    const value = await fn();
+    bleDebug(`${label}: ok`, summarizeBleValue(value));
+    return value;
+  }catch(err){
+    bleDebug(`${label}: fail`, bleErrorDetail(err));
+    throw err;
+  }
+}
+function summarizeBleValue(value){
+  if(!value) return value;
+  if(typeof BluetoothDevice !== "undefined" && value instanceof BluetoothDevice){
+    return {
+      name: value.name || null,
+      id: value.id,
+      gattConnected: !!(value.gatt && value.gatt.connected)
+    };
+  }
+  if(typeof BluetoothRemoteGATTServer !== "undefined" && value instanceof BluetoothRemoteGATTServer){
+    return {
+      connected: value.connected,
+      deviceName: value.device ? (value.device.name || null) : null,
+      deviceId: value.device ? value.device.id : null
+    };
+  }
+  if(typeof BluetoothRemoteGATTService !== "undefined" && value instanceof BluetoothRemoteGATTService){
+    return { uuid: value.uuid, isPrimary: value.isPrimary };
+  }
+  if(typeof BluetoothRemoteGATTCharacteristic !== "undefined" && value instanceof BluetoothRemoteGATTCharacteristic){
+    return {
+      uuid: value.uuid,
+      serviceUuid: value.service ? value.service.uuid : null,
+      properties: {
+        read: value.properties.read,
+        write: value.properties.write,
+        writeWithoutResponse: value.properties.writeWithoutResponse,
+        notify: value.properties.notify,
+        indicate: value.properties.indicate
+      }
+    };
+  }
+  return value;
+}
 /* helpers */
 function hexToBytes(hexStr){
   const cleaned = hexStr.replace(/0x/g,"").replace(/[^A-Fa-f0-9]/g,"");
@@ -834,13 +915,17 @@ function showInit(obj){
   log_duration_set.textContent = (obj.log_duration.value_days!=null) ? `${obj.log_duration.value_days} days` : "-- days";
   log_duration_default_card.textContent = (obj.log_duration.def_days!=null) ? `${obj.log_duration.def_days} days` : "-- days";
   log_duration_minmax.textContent = `${obj.log_duration.min_days ?? "--"} / ${obj.log_duration.max_days ?? "--"} days`;
-  console.log("INIT parsed & UI updated");
+  console.info("INIT parsed and UI updated");
 }
 /* write helper with logging */
 async function writeFrame(bytes, label){
   if(!writeChar) throw new Error("Not connected");
   console.log("TX " + label + " len=" + bytes.length + ": " + bytesToHexUpper(bytes));
-  try { writeInProgress = true; await writeChar.writeValue(bytes); }
+  try {
+    writeInProgress = true;
+    await writeChar.writeValue(bytes);
+    console.info(`TX ${label} ok`);
+  }
   catch(e){ console.error("Write error:", e); throw e; }
   finally{ writeInProgress = false; }
 }
@@ -930,23 +1015,26 @@ function waitForLogChunk(kind, chunkNumber, timeoutMs = 6000){
   });
 }
 function handleLogFrame(frameBytes){
-  appendRaw(frameBytes, isTagAt(frameBytes, 6, "vLOG") ? "vLOG" : "cLOG");
   const parsed = parseBatteryLogFrame(frameBytes);
   if(parsed.error){
     console.warn("Log parse error:", parsed.error);
     return;
   }
+  appendRaw(frameBytes, parsed.kind);
+  console.info(`${parsed.kind} chunk ${parsed.currentChunk}/${parsed.totalChunks}, points=${parsed.chunkLen}, ptr=${parsed.currentPtr}, cycle=${parsed.cycleNum}`);
   if(awaitingLogChunk && awaitingLogChunk.kind === parsed.kind && awaitingLogChunk.chunkNumber === parsed.currentChunk){
     awaitingLogChunk.resolve(parsed);
   } else {
-    console.log("Unsolicited log chunk:", parsed);
+    console.info("Unsolicited log chunk:", {
+      kind: parsed.kind,
+      currentChunk: parsed.currentChunk,
+      totalChunks: parsed.totalChunks,
+      chunkLen: parsed.chunkLen
+    });
   }
 }
 function processLogRxBytes(bytes){
-  console.log(`RX LOG FRAG len=${bytes.length}: ${bytesToHexUpper(bytes)}`);
-  appendRaw(bytes, 'LOG FRAG');
   logRxBuffer = concatBytes(logRxBuffer, bytes);
-  console.log(`LOG RX buffer len=${logRxBuffer.length}: ${bytesToHexUpper(logRxBuffer)}`);
   let handled = false;
   while(logRxBuffer.length >= 10){
     let start = -1;
@@ -971,7 +1059,7 @@ function processLogRxBytes(bytes){
     }
     const payloadLen = readU16le(logRxBuffer, 4, 5);
     const frameEnd = findFrameEnd(logRxBuffer, 17);
-    console.log(`LOG RX candidate tag=${String.fromCharCode(...logRxBuffer.slice(6,10))} payloadLen=${payloadLen} frameEnd=${frameEnd} buffered=${logRxBuffer.length}`);
+    void payloadLen;
     if(frameEnd < 0) return true;
     const frameLen = frameEnd + 4;
     const frame = logRxBuffer.slice(0, frameLen);
@@ -1047,36 +1135,75 @@ async function requestBatteryLogs(){
     refreshBatteryLogs.disabled = false;
   }
 }
+let lastRssiDbm = null;
+async function startRssiWatch(dev) {
+  if (!dev || typeof dev.watchAdvertisements !== "function") {
+    rssiText.textContent = "RSSI: unavailable";
+    console.info("RSSI unavailable: browser does not support BluetoothDevice.watchAdvertisements().");
+    return;
+  }
+  try {
+    dev.addEventListener("advertisementreceived", ev => {
+      if (typeof ev.rssi === "number") {
+        lastRssiDbm = ev.rssi;
+        rssiText.textContent = `RSSI: ${ev.rssi} dBm`;
+        console.info("Advertisement RSSI:", ev.rssi, "dBm");
+      }
+    });
+    rssiText.textContent = "RSSI: scanning...";
+    await dev.watchAdvertisements();
+    console.info("RSSI watch started");
+  } catch (err) {
+    rssiText.textContent = "RSSI: unavailable";
+    console.warn("RSSI watch failed:", err);
+  }
+}
 /* Robust connect/disconnect (original preserved exactly) */
 async function connect() {
-  console.log("Connect button clicked");
+  console.info("Connect button clicked");
+  bleDebug("connect clicked", {
+    protocol: location.protocol,
+    host: location.host,
+    bluetoothAvailable: !!navigator.bluetooth
+  });
   if (!navigator.bluetooth) {
     alert("Web Bluetooth is not available in this browser. Use Chrome/Chromium with Web Bluetooth enabled.");
     console.error("navigator.bluetooth missing");
+    bleDebug("navigator.bluetooth missing");
+    return;
+  }
+  if(device && device.gatt && device.gatt.connected){
+    console.info("Already connected");
     return;
   }
   const requestOptions = {
     filters: [{ namePrefix: "CARCAT" }, { name: "CARCAT_5G" }],
     optionalServices: [serviceUuid],
   };
-  console.log("Requesting device with options:", requestOptions);
+  console.info("Requesting CARCAT_5G device", requestOptions);
   try {
-    device = await navigator.bluetooth.requestDevice(requestOptions);
+    device = await bleStep("requestDevice", () => navigator.bluetooth.requestDevice(requestOptions));
     if (!device) {
       console.warn("No device selected (user probably cancelled chooser).");
+      bleDebug("requestDevice returned null");
       return;
     }
-    console.log("Device selected:", device.name || device.id);
+    console.info("Device selected:", device.name || device.id);
+    startRssiWatch(device);
     device.addEventListener("gattserverdisconnected", onDeviceDisconnected);
-    console.log("Connecting to GATT server...");
-    server = await device.gatt.connect();
-    console.log("Getting primary service:", serviceUuid);
-    const svc = await server.getPrimaryService(serviceUuid);
-    console.log("Getting characteristics...");
-    notifyChar = await svc.getCharacteristic(notifyCharUuid);
-    writeChar = await svc.getCharacteristic(writeCharUuid);
-    console.log("Starting notifications...");
-    await notifyChar.startNotifications();
+    if(!device.gatt){
+      throw new Error("Selected device has no GATT object");
+    }
+    console.info("Connecting to GATT server...");
+    server = await bleStep("gatt.connect", () => device.gatt.connect());
+    console.info("Getting primary service:", serviceUuid);
+    const svc = await bleStep("getPrimaryService FFF0", () => server.getPrimaryService(serviceUuid));
+    console.info("Getting notify characteristic:", notifyCharUuid);
+    notifyChar = await bleStep("getCharacteristic FFF1 notify", () => svc.getCharacteristic(notifyCharUuid));
+    console.info("Getting write characteristic:", writeCharUuid);
+    writeChar = await bleStep("getCharacteristic FFF2 write", () => svc.getCharacteristic(writeCharUuid));
+    console.info("Starting notifications...");
+    await bleStep("startNotifications FFF1", () => notifyChar.startNotifications());
     notifyChar.addEventListener("characteristicvaluechanged", onNotify);
     deviceName.textContent = device.name || device.id;
     bleText.textContent = "Connected";
@@ -1087,15 +1214,24 @@ async function connect() {
     sendInitBtn.disabled = false;
     startAutoBtn.disabled = false;
     stopAutoBtn.disabled = true;
-    console.log("Connected and notifications started.");
+    console.info("Connected and notifications started.");
+    bleDebug("connect complete");
+    if (lastRssiDbm == null && rssiText.textContent === "RSSI: scanning...") {
+      rssiText.textContent = "RSSI: -- dBm";
+    }
   } catch (err) {
     console.error("Connect failed:", err);
+    bleDebug("connect catch", bleErrorDetail(err));
+    if(device && device.gatt){
+      bleDebug("post-failure gatt state", summarizeBleValue(device.gatt));
+    }
     if (err.name === "NotFoundError" || /User cancelled/i.test(err.message || "")) {
       console.warn("User cancelled the device chooser.");
     } else {
       alert("Connect failed: " + (err.message || err));
     }
     deviceName.textContent = "Not connected";
+    rssiText.textContent = "RSSI: -- dBm";
     bleText.textContent = "Disconnected";
     statusDot.style.background = "#ff6b6b";
     connectButton.disabled = false;
@@ -1108,8 +1244,9 @@ async function connect() {
 }
 function onDeviceDisconnected(event) {
   const dev = event?.target;
-  console.log("Device disconnected:", dev ? (dev.name || dev.id) : dev);
+  console.info("Device disconnected:", dev ? (dev.name || dev.id) : dev);
   deviceName.textContent = "Not connected";
+  rssiText.textContent = "RSSI: -- dBm";
   bleText.textContent = "Disconnected";
   statusDot.style.background = "#ff6b6b";
   connectButton.disabled = false;
@@ -1123,18 +1260,19 @@ function onDeviceDisconnected(event) {
 async function disconnect() {
   try {
     if (device) {
-      console.log("Disconnect requested for device:", device.name || device.id);
+      console.info("Disconnect requested for device:", device.name || device.id);
       if (device.gatt && device.gatt.connected) {
         device.gatt.disconnect();
-        console.log("Device gatt.disconnect() called");
+        console.info("Device gatt.disconnect() called");
       } else {
-        console.log("Device was already disconnected.");
+        console.info("Device was already disconnected.");
       }
     }
   } catch (e) {
     console.error("Error during disconnect:", e);
   } finally {
     deviceName.textContent = "Not connected";
+    rssiText.textContent = "RSSI: -- dBm";
     bleText.textContent = "Disconnected";
     statusDot.style.background = "#ff6b6b";
     connectButton.disabled = false;
@@ -1146,7 +1284,7 @@ async function disconnect() {
     isAnimating = false;
   }
 }
-/* Notification handler (original) */
+/* Notification handler (original, with console-only debug) */
 function onNotify(ev){
   const arr = dataViewToBytes(ev.target.value);
   if((awaitingLogChunk || isLogTagAt(arr, 6)) && processLogRxBytes(arr)){
@@ -1174,7 +1312,7 @@ function onNotify(ev){
       try {
         const buf = initParsed._rawBuf;
         if (pendingSave && buf && buf.length > 10 && buf[10] === 1) {
-          console.log("ACK INIT received (byte10==1) for pending save");
+          console.info("ACK INIT received for pending save");
           pendingSave.resolve({ feature: pendingSave.feature, value: pendingSave.value, buf });
           pendingSave = null;
         }
@@ -1248,7 +1386,7 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
     frame[p++] = sliderRaw & 0xFF;
     frame[p++] = (sliderRaw >> 8) & 0xFF;
     frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
-    console.log(`TX SAVE [${featureKey}] len=${frame.length} : ${bytesToHexUpper(frame)}`);
+  console.log(`TX SAVE [${featureKey}] len=${frame.length}: ${bytesToHexUpper(frame)}`);
     await writeFrame(frame, `SAVE-${featureKey}`);
     return waitForInitAck(featureKey, sliderRaw, 5000);
   }
@@ -1261,7 +1399,7 @@ async function performSaveWrite(featureKey, enabledNow, sliderRaw){
   frame[p++] = sliderRaw & 0xFF;
   frame[p++] = (sliderRaw >> 8) & 0xFF;
   frame[p++] = 0x04; frame[p++] = 0x03; frame[p++] = 0x02; frame[p++] = 0x01;
-  console.log(`TX SAVE [${featureKey}] (EN=${enabledNow}) len=${frame.length} : ${bytesToHexUpper(frame)}`);
+  console.log(`TX SAVE [${featureKey}] (EN=${enabledNow}) len=${frame.length}: ${bytesToHexUpper(frame)}`);
   // write the frame first
   await writeFrame(frame, `SAVE-${featureKey}`);
   // then wait for INIT ack — this will create pendingSave and wait for onNotify to resolve it
@@ -1367,10 +1505,10 @@ document.querySelectorAll('.gear').forEach(g => {
     if (currentInitData) { openFeatureModal(feature); return; }
     if (!writeChar) { alert("Not connected. Please connect before editing features."); return; }
     try {
-      console.log("No INIT cached — sending INIT request before opening modal");
+      console.info("No INIT cached: sending INIT request before opening modal");
       await sendInitCmd();
       const initParsed = await waitForNextInit(3000); // 3s
-      console.log("Received INIT after request:", initParsed);
+      console.info("Received INIT after request");
       openFeatureModal(feature);
     } catch (err) {
       console.warn("Failed to get INIT before opening modal:", err);
